@@ -24,7 +24,7 @@ These are just current limitations which are planned to be handled in some futur
 
 ## Building and Installing
 
-Assuming that you want to use the `gcc 8` compiler and `OpenMP`, you can build the project as follows:
+Assuming that you want to use the `gcc 8` compiler, you can build the project as follows:
 ```bash
 # clone the repo
 git clone https://github.com/kabicm/Tiled-MM
@@ -41,7 +41,7 @@ make -j 4
 
 ## Example
 
-Using the library is very simple:
+Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
 // A dimensions: MxK
 auto a_host = gpu::malloc_pinned<value_type>(M*K, 1);

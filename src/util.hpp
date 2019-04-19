@@ -1,8 +1,6 @@
 #pragma once
-#include <cmath>
 #include <iostream>
 #include <cublas_v2.h>
-#include <cuda_profiler_api.h>
 #include <cuda_runtime_api.h>
 #include <string>
 #include <cmath>

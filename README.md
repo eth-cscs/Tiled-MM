@@ -8,7 +8,7 @@ When tested on `P100` GPU against NVIDIA's `cublasXt`, this library outperforms 
 <p align="center"><img src="https://github.com/kabicm/Tiled-MM/blob/master/docs/performance.svg" width="80%"></p>
 The main improvement comes from the fact that Tiled-MM preallocates the device buffers in the moment of the context-creation and then keeps reusing it, whereas cublasXt seems to allocate and deallocate device buffers on the fly.
 
-In the benchmark, we used double precision, `column-major` ordering of matrices, and `alpha = beta = 1.0`.
+In the benchmark, we used double precision, square matrices given in `column-major` ordering, and `alpha = beta = 1.0`.
 
 ## Features:
 
@@ -44,14 +44,14 @@ make -j 4
 Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
 // A dimensions: MxK
-auto a_host = gpu::malloc_pinned<value_type>(M*K, 1);
+auto a_host = gpu::malloc_pinned<double>(M*K, 1);
 // B dimensions: KxN
-auto b_host = gpu::malloc_pinned<value_type>(K*N, 1);
+auto b_host = gpu::malloc_pinned<double>(K*N, 1);
 // C dimensions: MxN
-auto c_host = gpu::malloc_pinned<value_type>(M*N, 0);
+auto c_host = gpu::malloc_pinned<double>(M*N, 0);
 
 double alpha = 1.0;
-value_type beta = 1.0;
+double beta = 1.0;
 
 // preallocates device buffers and other CUDA stuff
 auto ctx = gpu::make_context();

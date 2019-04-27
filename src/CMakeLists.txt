@@ -12,5 +12,5 @@ set(sources
 ###################
 #     Library     #
 ###################
-add_library(tiled-mm ${sources})
-target_link_libraries(tiled-mm ${DEPENDENCIES})
+add_library(Tiled-MM ${sources})
+target_link_libraries(Tiled-MM ${DEPENDENCIES})

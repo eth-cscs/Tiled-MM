@@ -27,7 +27,7 @@ These are just current limitations which are planned to be handled in some futur
 Assuming that you want to use the `gcc 8` compiler, you can build the project as follows:
 ```bash
 # clone the repo
-git clone https://github.com/kabicm/Tiled-MM
+git clone --recursive https://github.com/kabicm/Tiled-MM
 cd Tiled-MM
 mkdir build
 cd build

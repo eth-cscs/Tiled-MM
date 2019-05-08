@@ -40,11 +40,6 @@ enable_testing()
 #####################################
 #  Adding various code directories  #
 #####################################
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src")
-if (NOT TARGET options)
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/options/src")
-endif()
-
 add_subdirectory(src)
 add_subdirectory(libs)
 add_subdirectory(examples)

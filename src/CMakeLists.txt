@@ -14,3 +14,4 @@ set(sources
 ###################
 add_library(Tiled-MM ${sources})
 target_link_libraries(Tiled-MM ${DEPENDENCIES})
+target_include_directories(Tiled-MM PUBLIC ${PROJECT_SOURCE_DIR}/src)

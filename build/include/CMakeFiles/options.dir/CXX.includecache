@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/kabicm/Projects/tiled-mm/include/options.cpp
+options.hpp
+/Users/kabicm/Projects/tiled-mm/include/options.hpp
+
+/Users/kabicm/Projects/tiled-mm/include/options.hpp
+string
+-
+regex
+-
+stdexcept
+-
+iostream
+-
+

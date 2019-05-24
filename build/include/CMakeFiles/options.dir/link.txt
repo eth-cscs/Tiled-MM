@@ -1,0 +1,2 @@
+/usr/bin/ar qc liboptions.a  CMakeFiles/options.dir/options.cpp.o
+/usr/bin/ranlib liboptions.a

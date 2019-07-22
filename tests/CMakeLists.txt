@@ -1,8 +1,9 @@
 ################
 #  Build test  #
 ################
+
 add_executable(test-multiply "test-multiply.cpp")
-target_link_libraries(test-multiply Tiled-MM options ${DEPENDENCIES})
+target_link_libraries(test-multiply Tiled-MM options)
 
 ################
 #  unit gtests #

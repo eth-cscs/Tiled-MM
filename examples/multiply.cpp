@@ -32,12 +32,12 @@ int main(int argc, char** argv){
     value_type alpha{1.};
     value_type beta{1.};
 
-    auto ctx = gpu::make_context();
+    auto ctx = gpu::make_context<double>();
 
     auto start = std::chrono::steady_clock::now();
     for(int i=0; i<num_runs; ++i) {
         // compute c = alpha * a * b + beta * c
-        gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
     }
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

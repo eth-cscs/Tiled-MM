@@ -6,9 +6,10 @@
 
 namespace gpu {
 
+template<typename Scalar>
 class tiled_matrix {
 public:
-    tiled_matrix(double* host_ptr, int rows, int cols, tile_dim d);
+    tiled_matrix(Scalar* host_ptr, int rows, int cols, tile_dim d);
 
     tile_dim tile_dimensions();
 
@@ -17,17 +18,17 @@ public:
     int rows();
     int cols();
 
-    double* data();
+    Scalar* data();
 
     int tile_offset(tile_coord t_coord);
 
-    double* tile_data(tile_coord tile);
+    Scalar* tile_data(tile_coord tile);
 
     int num_tiles_row();
     int num_tiles_col();
 
 private:
-    double* ptr;
+    Scalar* ptr;
     int n_rows;
     int n_cols;
     tile_dim tile;

@@ -1,24 +1,6 @@
 #pragma once
-#include <iostream>
-#include <cmath>
-#include <cstdio>
-#include "util.hpp"
-#include "cuda_stream.hpp"
-#include "cuda_event.hpp"
-// #include "../blas.h"
-#include <vector>
-// #include <omp.h>
-#include <cstring>
-#include "cublas_handle.hpp"
-#include "tile_coord.hpp"
-#include "gpu_context.hpp"
-#include "device_buffer.hpp"
-#include "tiled_matrix.hpp"
-// #include <cublasXt.h>
-#include <tuple>
+
 #include "mm_handle.hpp"
-#include "tile_coord.hpp"
-// #include <libsci_acc.h>
 
 /*
   **************************************
@@ -79,22 +61,12 @@
 */
 namespace gpu {
 
-template <typename T>
-void copy_tile_to_device_async(tiled_matrix& tiled_mat, device_buffer<T>& d_buffer,
-        tile_coord tile, gpu_context& ctx, int stream_id);
-
-template <typename T>
-void copy_tile_to_host_async(tiled_matrix& tiled_mat, device_buffer<T>& d_buffer,
-        tile_coord tile, gpu_context& ctx, int stream_id);
-
 // **************************************
 //        TILED-GEMM ON GPU
 // **************************************
-void dgemm(mm_handle& handle, double* a, double* b, double* c,
+template<typename Scalar>
+void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
           int m, int n, int k,
-          double alpha, double beta);
+          Scalar alpha, Scalar beta);
 
-void dgemm(context& ctx, double* a, double* b, double* c,
-          int m, int n, int k,
-          double alpha, double beta);
 }

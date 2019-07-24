@@ -8,9 +8,6 @@
 
 namespace gpu {
 
-using value_type = double;
-using size_type  = std::size_t;
-
 static const char* cudaGetErrorEnum(cublasStatus_t error)
 {
     switch (error)

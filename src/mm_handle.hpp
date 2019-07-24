@@ -8,6 +8,7 @@
 
 namespace gpu{
 
+template <typename Scalar>
 class mm_handle {
 public:
     mm_handle();
@@ -29,9 +30,9 @@ public:
 
     void set_streams_and_tiles(int streams, int tile_size_m, int tile_size_n, int tile_size_k);
 
-    device_buffer<double>& get_device_buffer_a();
-    device_buffer<double>& get_device_buffer_b();
-    device_buffer<double>& get_device_buffer_c();
+    device_buffer<Scalar>& get_device_buffer_a();
+    device_buffer<Scalar>& get_device_buffer_b();
+    device_buffer<Scalar>& get_device_buffer_c();
 
 private:
     int n_streams = 4;
@@ -41,13 +42,19 @@ private:
 
     gpu_context ctx;
 
-    device_buffer<double> a_buff;
-    device_buffer<double> b_buff;
-    device_buffer<double> c_buff;
+    device_buffer<Scalar> a_buff;
+    device_buffer<Scalar> b_buff;
+    device_buffer<Scalar> c_buff;
 };
 
-typedef std::unique_ptr<mm_handle> context;
-context make_context();
-context make_context(int streams, int tile_m, int tile_n, int tile_k);
+template <typename Scalar>
+std::unique_ptr<mm_handle<Scalar>> make_context() {
+    return std::make_unique<mm_handle<Scalar>>();
+}
+
+template <typename Scalar>
+std::unique_ptr<mm_handle<Scalar>> make_context(int streams, int tile_m, int tile_n, int tile_k) {
+    return std::make_unique<mm_handle<Scalar>>(streams, tile_m, tile_n, tile_k);
+}
 
 }

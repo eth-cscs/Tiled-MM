@@ -1,8 +1,11 @@
 #include "tiled_matrix.hpp"
 
+#include <complex>
+
 using namespace gpu;
 
-tiled_matrix::tiled_matrix(double* host_ptr, int rows, int cols, tile_dim d):
+template<typename Scalar>
+tiled_matrix<Scalar>::tiled_matrix(Scalar* host_ptr, int rows, int cols, tile_dim d):
         ptr(host_ptr), n_rows(rows), n_cols(cols), tile(d) {
 
     tile.set_rows(std::min(tile.rows(), rows));
@@ -16,11 +19,13 @@ tiled_matrix::tiled_matrix(double* host_ptr, int rows, int cols, tile_dim d):
     short_tile = tile_dim(short_tile_size_row, short_tile_size_col);
 }
 
-tile_dim tiled_matrix::tile_dimensions() {
+template<typename Scalar>
+tile_dim tiled_matrix<Scalar>::tile_dimensions() {
     return tile;
 }
 
-tile_dim tiled_matrix::tile_dimensions(tile_coord t_coord) {
+template<typename Scalar>
+tile_dim tiled_matrix<Scalar>::tile_dimensions(tile_coord t_coord) {
     int row_size = actual_size(n_tiles_row, t_coord.row_index(),
            tile.rows(), short_tile.rows());
 
@@ -30,40 +35,53 @@ tile_dim tiled_matrix::tile_dimensions(tile_coord t_coord) {
     return tile_dim(row_size, col_size);
 }
 
-int tiled_matrix::rows() {
+template<typename Scalar>
+int tiled_matrix<Scalar>::rows() {
     return n_rows;
 }
 
-int tiled_matrix::cols() {
+template<typename Scalar>
+int tiled_matrix<Scalar>::cols() {
     return n_cols;
 }
 
-double* tiled_matrix::data() {
+template<typename Scalar>
+Scalar* tiled_matrix<Scalar>::data() {
     return ptr;
 }
 
-int tiled_matrix::tile_offset(tile_coord t_coord) {
+template<typename Scalar>
+int tiled_matrix<Scalar>::tile_offset(tile_coord t_coord) {
     int tile_offset_global = (t_coord.col_index()*tile.cols()) * n_rows;
     int el_offset_global = t_coord.row_index() * tile.rows();
     int offset = tile_offset_global + el_offset_global;
     return offset;
 }
 
-double* tiled_matrix::tile_data(tile_coord tile) {
+template<typename Scalar>
+Scalar* tiled_matrix<Scalar>::tile_data(tile_coord tile) {
     return data() + tile_offset(tile);
 }
 
-int tiled_matrix::actual_size(int n_tiles, int tile_id, int tile_length, int tile_remainder) {
+template<typename Scalar>
+int tiled_matrix<Scalar>::actual_size(int n_tiles, int tile_id, int tile_length, int tile_remainder) {
     bool last_tile = tile_id == n_tiles - 1;
     bool not_divisible = tile_remainder > 0;
 
     return last_tile && not_divisible ? tile_remainder : tile_length;
 }
 
-int tiled_matrix::num_tiles_row() {
+template<typename Scalar>
+int tiled_matrix<Scalar>::num_tiles_row() {
     return n_tiles_row;
 }
 
-int tiled_matrix::num_tiles_col() {
+template<typename Scalar>
+int tiled_matrix<Scalar>::num_tiles_col() {
     return n_tiles_col;
 }
+
+template class gpu::tiled_matrix<float>;
+template class gpu::tiled_matrix<double>;
+template class gpu::tiled_matrix<std::complex<float>>;
+template class gpu::tiled_matrix<std::complex<double>>;

@@ -61,9 +61,9 @@ int main(int argc, char** argv){
 
     cublasXt_dgemm(a_host, b_host, c_host_xt, M, N, K, alpha, beta);
 
-    auto ctx = gpu::make_context();
+    auto ctx = gpu::make_context<double>();
     // compute c = alpha * a * b + beta * c
-    gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+    gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
 
     bool correct = equal(c_host, c_host_xt, M*N);
 

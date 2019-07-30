@@ -8,6 +8,10 @@
 #
 include(FindPackageHandleStandardArgs)
 
+if (NOT CUDA_PATH)
+    set(CUDA_PATH "$ENV{CUDA_PATH}")
+endif()
+
 if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
     # If CUDA was enabled as a language, we already have the variable.
     #
@@ -16,10 +20,8 @@ if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
 else()
     find_path(CUDA_TOOLKIT_INCLUDE 
               device_functions.h # Header included in toolkit
-        PATHS ${CUDA_TOOLKIT_TARGET_DIR}
-              ENV CUDA_PATH
-              ${CUDA_PATH}
-              ENV CUDA_INC_PATH
+        PATHS ${CUDA_PATH}
+              ${CUDA_TOOLKIT_TARGET_DIR}
         PATH_SUFFIXES include
         NO_DEFAULT_PATH)
 endif()
@@ -27,8 +29,7 @@ endif()
 function(__cuda_find_library _name)
     find_library(${_name}
         NAMES ${ARGN}
-        HINTS ENV CUDA_PATH
-              ${CUDA_PATH}
+        HINTS ${CUDA_PATH}
         PATH_SUFFIXES lib
                       lib64
         )

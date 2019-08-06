@@ -17,35 +17,24 @@ if(MASTER_PROJECT AND NOT CMAKE_BUILD_TYPE)
     "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release." FORCE)
 endif()
 
+# Dependencies
+#
 find_package(CUBLAS REQUIRED)
-add_library(Tiled-MM STATIC "${PROJECT_SOURCE_DIR}/src/gpu_context.cpp"
-                            "${PROJECT_SOURCE_DIR}/src/mm_handle.cpp"
-                            "${PROJECT_SOURCE_DIR}/src/tile_dim.cpp"
-                            "${PROJECT_SOURCE_DIR}/src/tiled_matrix.cpp"
-                            "${PROJECT_SOURCE_DIR}/src/tiled_mm.cpp"
-                            "${PROJECT_SOURCE_DIR}/src/tile_coord.cpp")
-target_link_libraries(Tiled-MM PUBLIC CUDA::cublas)
-target_include_directories(Tiled-MM PUBLIC 
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
-    )
-target_compile_features(Tiled-MM PUBLIC cxx_std_14)
+
+# Tiled-MM
+#
+add_subdirectory(src/Tiled-MM)
 
 if(TILEDMM_WITH_INSTALL)
     include(CMakePackageConfigHelpers)
     include(GNUInstallDirs)
-    
-    install(TARGETS Tiled-MM
-            EXPORT Tiled-MM_targets
-            LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-            ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-            INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
     
     install(EXPORT Tiled-MM_targets
             FILE Tiled-MMTargets.cmake
             NAMESPACE Tiled-MM::
             DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tiled-MM")
     
-    install(DIRECTORY "${Tiled-MM_SOURCE_DIR}/src" 
+    install(DIRECTORY "${Tiled-MM_SOURCE_DIR}/src/Tiled-MM" 
             DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
             FILES_MATCHING PATTERN "*.hpp")
     
@@ -64,7 +53,7 @@ if(TILEDMM_WITH_INSTALL)
 endif()
 
 if(TILEDMM_WITH_TESTS OR TILEDMM_WITH_EXAMPLES)
-    add_subdirectory("${PROJECT_SOURCE_DIR}/libs/options")
+    add_subdirectory(libs/options)
 endif()
 
 if(TILEDMM_WITH_TESTS)

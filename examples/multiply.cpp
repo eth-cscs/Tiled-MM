@@ -1,10 +1,11 @@
+#include <Tiled-MM/tiled_mm.hpp>
+
+#include <options.hpp>
+
 #include <iostream>
 #include <cmath>
 #include <cstdio>
 #include <chrono>
-
-#include <options.hpp>
-#include <tiled_mm.hpp>
 
 using value_type = double;
 using size_type  = size_t;

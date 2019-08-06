@@ -9,7 +9,7 @@
 include(FindPackageHandleStandardArgs)
 
 if (NOT CUDA_PATH)
-    set(CUDA_PATH "$ENV{CUDA_PATH}")
+    set(CUDA_PATH $ENV{CUDA_PATH})
 endif()
 
 if(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)

@@ -1,12 +1,13 @@
+#include <Tiled-MM/tiled_mm.hpp>
+
+#include <options.hpp>
+
+#include <cublasXt.h>
+
 #include <iostream>
 #include <cmath>
 #include <cstdio>
 #include <chrono>
-
-#include <options.hpp>
-#include <tiled_mm.hpp>
-
-#include <cublasXt.h>
 
 using value_type = double;
 using size_type  = size_t;

@@ -104,7 +104,7 @@ cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
                         a, m,
                         b, k,
                         beta,
-                        c, n);
+                        c, m);
 }
 
 cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
@@ -121,7 +121,7 @@ cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
                         a, m,
                         b, k,
                         beta,
-                        c, n);
+                        c, m);
 }
 
 // Note: Converting from std::complex to cuComplex and cuDoubleComple
@@ -143,7 +143,7 @@ cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
                         reinterpret_cast<const cuComplex*>(a), m,
                         reinterpret_cast<const cuComplex*>(b), k,
                         reinterpret_cast<const cuComplex*>(beta),
-                        reinterpret_cast<cuComplex*>(c), n);
+                        reinterpret_cast<cuComplex*>(c), m);
 }
 
 cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
@@ -160,7 +160,7 @@ cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
                         reinterpret_cast<const cuDoubleComplex*>(a), m,
                         reinterpret_cast<const cuDoubleComplex*>(b), k,
                         reinterpret_cast<const cuDoubleComplex*>(beta),
-                        reinterpret_cast<cuDoubleComplex*>(c), n);
+                        reinterpret_cast<cuDoubleComplex*>(c), m);
 }
 
 template<typename Scalar>
@@ -282,7 +282,6 @@ template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         int m, int n, int k,
         Scalar alpha, Scalar beta) {
-
     int tile_size_m, tile_size_n, tile_size_k;
     std::tie(tile_size_m, tile_size_n, tile_size_k) = handle.get_tile_sizes();
 

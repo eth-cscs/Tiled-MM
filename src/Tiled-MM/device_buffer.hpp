@@ -37,7 +37,8 @@ private:
 template<typename T>
 device_buffer<T>::device_buffer(int streams, tile_dim tile): 
         n_streams(streams), tile_(tile) {
-    d_vec = device_vector<T>(streams * tile_.size());
+    // std::cout << "creating device buffer of size = " << streams  << " * " << tile_.size() << std::endl;
+    d_vec = device_vector<T>(streams * tile.size());
 }
 
 template<typename T>

@@ -22,7 +22,6 @@ endfunction()
 #
 if (NOT CUDA_PATH)
     if (DEFINED ENV{CUDA_PATH})
-      message("ALIVE")
         set(CUDA_PATH $ENV{CUDA_PATH})
     elseif (CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
         # If CUDA was enabled as a language, we already have the variable.

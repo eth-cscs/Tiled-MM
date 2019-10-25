@@ -1,12 +1,37 @@
 #include "mm_handle.hpp"
 
 #include<complex>
+#include <cmath>
+#include <iostream>
 
 namespace gpu {
 
 template <typename Scalar>
-mm_handle<Scalar>::mm_handle(): ctx(n_streams) {
+int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu) {
+    size_t free, total;
+    // query available memory
+    cudaMemGetInfo(&free, &total);
+
+    // use up to 90% of the available memory
+    // divide by 3, because 3 matrices A, B and C
+    double memory_available = 0.9 * free / (3 * n_streams * sizeof(Scalar));
+    // set tiles to be square by default, so take the sqrt
+    int tile_size = (int) std::sqrt(memory_available);
+
+    // don't make tiles larger than 5000
+    tile_size = std::min(tile_size, max_tile_size);
+
+    return tile_size;
+}
+
+template <typename Scalar>
+mm_handle<Scalar>::mm_handle(int ranks_per_gpu): ctx(n_streams) {
     cudaSetDevice(0);
+
+    int tile_size = get_tile_size<Scalar>(n_streams, tile_size_m, ranks_per_gpu);
+    tile_size_m = tile_size;
+    tile_size_n = tile_size;
+    tile_size_k = tile_size;
 
     a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
     b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});

@@ -11,7 +11,7 @@ namespace gpu{
 template <typename Scalar>
 class mm_handle {
 public:
-    mm_handle();
+    mm_handle(int ranks_per_gpu);
     mm_handle(int streams, int tile_m, int tile_n, int tile_k);
     ~mm_handle();
 
@@ -35,10 +35,10 @@ public:
     device_buffer<Scalar>& get_device_buffer_c();
 
 private:
-    int n_streams = 4;
-    int tile_size_m = 4000;
-    int tile_size_n = 4000;
-    int tile_size_k = 4000;
+    int n_streams = 2;
+    int tile_size_m = 5000;
+    int tile_size_n = 5000;
+    int tile_size_k = 5000;
 
     gpu_context ctx;
 
@@ -48,8 +48,8 @@ private:
 };
 
 template <typename Scalar>
-std::unique_ptr<mm_handle<Scalar>> make_context() {
-    return std::make_unique<mm_handle<Scalar>>();
+std::unique_ptr<mm_handle<Scalar>> make_context(int ranks_per_gpu = 1) {
+    return std::make_unique<mm_handle<Scalar>>(ranks_per_gpu);
 }
 
 template <typename Scalar>

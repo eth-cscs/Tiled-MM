@@ -23,10 +23,16 @@ endfunction()
 if (NOT CUDA_PATH)
     if (DEFINED ENV{CUDA_PATH})
         set(CUDA_PATH $ENV{CUDA_PATH})
+    elseif (DEFINED ENV{CUDATOOLKIT_HOME})
+        set(CUDA_PATH $ENV{CUDATOOLKIT_HOME})
+    elseif (DEFINED ENV{CUDA_TOOLKIT_INCLUDE})
+        set(CUDA_PATH $ENV{CUDA_TOOLKIT_INCLUDE})
     elseif (CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
         # If CUDA was enabled as a language, we already have the variable.
         #
         get_filename_component(CUDA_PATH "${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}" DIRECTORY)
+    else()
+        message("CUDA not found. Please specify CUDA_PATH variable.")
     endif()
 endif()
 
@@ -34,6 +40,8 @@ find_path(CUDA_TOOLKIT_INCLUDE
           device_functions.h # Header included in toolkit
     PATHS ${CUDA_PATH}
           ${CUDA_TOOLKIT_TARGET_DIR}
+          ${CUDATOOLKIT_HOME}
+          ${CUDA_TOOLKIT_INCLUDE}
     PATH_SUFFIXES include
     NO_DEFAULT_PATH)
 

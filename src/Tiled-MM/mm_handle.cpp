@@ -2,7 +2,7 @@
 
 #include<complex>
 #include <cmath>
-#include <iostream>
+#include <cassert>
 
 namespace gpu {
 
@@ -20,6 +20,8 @@ int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu, double al
 
     // don't make tiles larger than 5000
     tile_size = std::min(tile_size, max_tile_size);
+
+    assert(tile_size > 0 && tile_size <= max_tile_size);
 
     return tile_size;
 }

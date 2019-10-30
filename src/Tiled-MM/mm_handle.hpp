@@ -11,7 +11,7 @@ namespace gpu{
 template <typename Scalar>
 class mm_handle {
 public:
-    mm_handle(int ranks_per_gpu = 1, double allowance_ratio = 0.9);
+    mm_handle(int ranks_per_gpu, double allowance_ratio);
     mm_handle(int streams, int tile_m, int tile_n, int tile_k);
     ~mm_handle();
 
@@ -48,8 +48,8 @@ private:
 };
 
 template <typename Scalar>
-std::unique_ptr<mm_handle<Scalar>> make_context(int ranks_per_gpu = 1) {
-    return std::make_unique<mm_handle<Scalar>>(ranks_per_gpu);
+std::unique_ptr<mm_handle<Scalar>> make_context(int ranks_per_gpu = 1, double allowance_ratio = 0.9) {
+    return std::make_unique<mm_handle<Scalar>>(ranks_per_gpu, allowance_ratio);
 }
 
 template <typename Scalar>

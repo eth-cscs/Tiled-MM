@@ -7,14 +7,14 @@
 namespace gpu {
 
 template <typename Scalar>
-int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu) {
+int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu, double allowance_ratio) {
     size_t free, total;
     // query available memory
     cudaMemGetInfo(&free, &total);
 
-    // use up to 90% of the available memory
+    // use up to allowance_ratio % of the available memory
     // divide by 3, because 3 matrices A, B and C
-    double memory_available = 0.9 * free / (3 * n_streams * sizeof(Scalar));
+    double memory_available = allowance_ratio * free / (3 * n_streams * sizeof(Scalar));
     // set tiles to be square by default, so take the sqrt
     int tile_size = (int) std::sqrt(memory_available);
 
@@ -25,10 +25,10 @@ int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu) {
 }
 
 template <typename Scalar>
-mm_handle<Scalar>::mm_handle(int ranks_per_gpu): ctx(n_streams) {
+mm_handle<Scalar>::mm_handle(int ranks_per_gpu, double allowance_ratio): ctx(n_streams) {
     cudaSetDevice(0);
 
-    int tile_size = get_tile_size<Scalar>(n_streams, tile_size_m, ranks_per_gpu);
+    int tile_size = get_tile_size<Scalar>(n_streams, tile_size_m, ranks_per_gpu, allowance_ratio);
     tile_size_m = tile_size;
     tile_size_n = tile_size;
     tile_size_k = tile_size;

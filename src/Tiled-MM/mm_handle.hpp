@@ -11,7 +11,7 @@ namespace gpu{
 template <typename Scalar>
 class mm_handle {
 public:
-    mm_handle(int ranks_per_gpu);
+    mm_handle(int ranks_per_gpu = 1, double allowance_ratio = 0.9);
     mm_handle(int streams, int tile_m, int tile_n, int tile_k);
     ~mm_handle();
 

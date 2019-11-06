@@ -1,14 +1,16 @@
 #include "tiled_mm.hpp"
 
 #include "util.hpp"
-#include "cuda_stream.hpp"
-#include "cuda_event.hpp"
-#include "cublas_handle.hpp"
+#include "device_stream.hpp"
+#include "device_event.hpp"
+#include "gpu_blas_handle.hpp"
 #include "tile_coord.hpp"
 #include "gpu_context.hpp"
 #include "device_buffer.hpp"
 #include "tiled_matrix.hpp"
 #include "tile_coord.hpp"
+#include "gpu_blas_api.hpp"
+#include "gpu_runtime_api.hpp"
 
 // #include <omp.h>
 // #include <cublasXt.h>
@@ -37,11 +39,11 @@ void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Sc
     // std::cout << "host->device" << std::endl;
 
     auto status=
-    cudaMemcpy2DAsync(to, tile_dims.rows() * sizeof(Scalar),
+    runtime_api::memcpy_2d_async(to, tile_dims.rows() * sizeof(Scalar),
             from, tiled_mat.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            cudaMemcpyHostToDevice, ctx.get_cuda_stream(stream_id));
-    cuda_check_status(status);
+            runtime_api::flag::MemcpyHostToDevice, ctx.get_device_stream(stream_id));
+    check_runtime_status(status);
 }
 
 template<typename Scalar>
@@ -54,11 +56,11 @@ void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scal
 
     // std::cout << "device->host" << std::endl;
     auto status=
-    cudaMemcpy2DAsync(to, tiled_mat.rows() * sizeof(Scalar),
+    runtime_api::memcpy_2d_async(to, tiled_mat.rows() * sizeof(Scalar),
             from, tile_dims.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            cudaMemcpyDeviceToHost, ctx.get_cuda_stream(stream_id));
-    cuda_check_status(status);
+            runtime_api::flag::MemcpyDeviceToHost, ctx.get_device_stream(stream_id));
+    check_runtime_status(status);
 }
 
 template<typename Scalar>
@@ -90,38 +92,26 @@ std::tuple<int, int, int> get_tile_sizes(tiled_matrix<Scalar>& a,
 
 
 
-cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    int m, int n, int k,
                                    const float* alpha,
                                    const float* a,
                                    const float* b,
                                    const float* beta,
                                    float* c) {
-    return  cublasSgemm(handle,
-                        CUBLAS_OP_N, CUBLAS_OP_N,
-                        m, n, k,
-                        alpha,
-                        a, m,
-                        b, k,
-                        beta,
-                        c, m);
+  return blas_api::sgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         alpha, a, m, b, k, beta, c, m);
 }
 
-cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    int m, int n, int k,
                                    const double* alpha,
                                    const double* a,
                                    const double* b,
                                    const double* beta,
                                    double* c) {
-    return  cublasDgemm(handle,
-                        CUBLAS_OP_N, CUBLAS_OP_N,
-                        m, n, k,
-                        alpha,
-                        a, m,
-                        b, k,
-                        beta,
-                        c, m);
+  return blas_api::dgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         alpha, a, m, b, k, beta, c, m);
 }
 
 // Note: Converting from std::complex to cuComplex and cuDoubleComple
@@ -129,38 +119,34 @@ cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
 //
 //       http://icl.cs.utk.edu/magma/forum/viewtopic.php?f=2&t=902
 //
-cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    int m, int n, int k,
                                    const zfloat* alpha,
                                    const zfloat* a,
                                    const zfloat* b,
                                    const zfloat* beta,
                                    zfloat* c) {
-    return  cublasCgemm(handle,
-                        CUBLAS_OP_N, CUBLAS_OP_N,
-                        m, n, k,
-                        reinterpret_cast<const cuComplex*>(alpha),
-                        reinterpret_cast<const cuComplex*>(a), m,
-                        reinterpret_cast<const cuComplex*>(b), k,
-                        reinterpret_cast<const cuComplex*>(beta),
-                        reinterpret_cast<cuComplex*>(c), m);
+  return blas_api::cgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(alpha),
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(a), m,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(b), k,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(beta),
+                         reinterpret_cast<blas_api::ComplexFloatType*>(c), m);
 }
 
-cublasStatus_t cublas_gemm_wrapper(cublasHandle_t handle,
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    int m, int n, int k,
                                    const zdouble* alpha,
                                    const zdouble* a,
                                    const zdouble* b,
                                    const zdouble* beta,
                                    zdouble* c) {
-    return  cublasZgemm(handle,
-                        CUBLAS_OP_N, CUBLAS_OP_N,
-                        m, n, k,
-                        reinterpret_cast<const cuDoubleComplex*>(alpha),
-                        reinterpret_cast<const cuDoubleComplex*>(a), m,
-                        reinterpret_cast<const cuDoubleComplex*>(b), k,
-                        reinterpret_cast<const cuDoubleComplex*>(beta),
-                        reinterpret_cast<cuDoubleComplex*>(c), m);
+  return blas_api::zgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(alpha),
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(a), m,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(b), k,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(beta),
+                         reinterpret_cast<blas_api::ComplexDoubleType*>(c), m);
 }
 
 template<typename Scalar>
@@ -213,17 +199,17 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         }
                     } else {
                         // perform dgemm
-                        // cublasSetStream(get_cublas_handle(stream_id), streams[stream_id].stream());
+                        // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
                         auto status = cublas_gemm_wrapper(
-                                    gpu_ctx.get_cublas_handle(stream_id),
+                                    gpu_ctx.get_blas_handle(stream_id),
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
                                 b_device.stream_buffer(stream_id),
                                 &new_beta,
                                 c_device.stream_buffer(stream_id));
-                        cublas_check_status(status);
+                        check_blas_status(status);
 
 
                         if (k_tile_id == n_tiles_k - 1) {
@@ -298,8 +284,8 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
                 m, n, k, alpha, beta, handle);
 
     auto status =
-    cudaDeviceSynchronize();
-    cuda_check_status(status);
+    runtime_api::device_synchronize();
+    check_runtime_status(status);
 }
 
 

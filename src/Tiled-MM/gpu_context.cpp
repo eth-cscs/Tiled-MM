@@ -1,4 +1,6 @@
 #include "gpu_context.hpp"
+#include "gpu_blas_api.hpp"
+#include "gpu_runtime_api.hpp"
 
 namespace gpu {
 gpu_context::gpu_context(int _streams): n_streams(_streams) {
@@ -10,26 +12,26 @@ gpu_context::gpu_context(int _streams): n_streams(_streams) {
         // let each stream use a separate cuBLAS handle
         // and let each handle be bound to a separate stream
         auto status=
-        cublasSetStream(get_cublas_handle(stream_id), get_cuda_stream(stream_id));
-        cublas_check_status(status);
+        blas_api::set_stream(get_blas_handle(stream_id), get_device_stream(stream_id));
+        check_blas_status(status);
     }
 }
 
-cublasHandle_t gpu_context::get_cublas_handle(int stream_id) const {
+blas_api::HandleType gpu_context::get_blas_handle(int stream_id) const {
     if (stream_id < 0 || stream_id >= n_streams) {
-        throw std::runtime_error("index of cublas handle has to be in the range [0, n_streams)");
+        throw std::runtime_error("index of gpu blas handle has to be in the range [0, n_streams)");
     }
     return handles[stream_id].handle();
 }
 
-cudaStream_t gpu_context::get_cuda_stream(int stream_id) const {
+runtime_api::StreamType gpu_context::get_device_stream(int stream_id) const {
     if (stream_id < 0 || stream_id >= n_streams) {
-        throw std::runtime_error("index of cublas handle has to be in the range [0, n_streams)");
+        throw std::runtime_error("index of gpu blas handle has to be in the range [0, n_streams)");
     }
     return streams[stream_id].stream();
 }
 
-cuda_event gpu_context::enqueue_event(int stream_id) const {
+device_event gpu_context::enqueue_event(int stream_id) const {
     return streams[stream_id].enqueue_event();
 }
 

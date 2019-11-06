@@ -33,7 +33,7 @@ int main(int argc, char** argv){
     value_type alpha{1.};
     value_type beta{1.};
 
-    auto ctx = gpu::make_context<double>();
+    auto ctx = gpu::make_context<double>(2, 10000, 10000, 10000);
 
     auto start = std::chrono::steady_clock::now();
     for(int i=0; i<num_runs; ++i) {

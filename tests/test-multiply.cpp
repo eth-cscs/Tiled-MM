@@ -1,18 +1,19 @@
 #include <Tiled-MM/tiled_mm.hpp>
+#include <Tiled-MM/device_vector.hpp>
+#include <Tiled-MM/util.hpp>
+#include <Tiled-MM/gpu_blas_handle.hpp>
+#include <Tiled-MM/gpu_blas_api.hpp>
 
 #include <options.hpp>
-
-#include <cublasXt.h>
-
 #include <iostream>
 #include <cmath>
 #include <cstdio>
 #include <chrono>
 
-using value_type = double;
-using size_type  = size_t;
+#ifdef TILED_MM_CUDA
+#include <cublasXt.h>
 
-void cublasXt_dgemm(double* a, double* b, double* c,
+void compute_reference(double* a, double* b, double* c,
         int m, int n, int k,
         double alpha, double beta) {
     cublasXtHandle_t handle;
@@ -29,6 +30,33 @@ void cublasXt_dgemm(double* a, double* b, double* c,
     if (handle)
         cublasXtDestroy(handle);
 }
+#endif
+
+
+#ifdef TILED_MM_ROCM
+#include "Tiled-MM/gpu_runtime_api.hpp"
+void compute_reference(double* a, double* b, double* c,
+        int m, int n, int k,
+        double alpha, double beta) {
+    gpu::device_vector<double> a_device(m * k);
+    gpu::device_vector<double> b_device(k * n);
+    gpu::device_vector<double> c_device(m * n);
+    gpu::copy_to_device(a, a_device.data(), a_device.size());
+    gpu::copy_to_device(b, b_device.data(), b_device.size());
+    gpu::copy_to_device(c, c_device.data(), c_device.size());
+    gpu::gpu_blas_handle handle;
+
+    gpu::blas_api::dgemm(handle.handle(), gpu::blas_api::operation::None,
+                         gpu::blas_api::operation::None, m, n, k, &alpha, a_device.data(), m,
+                         b_device.data(), k, &beta, c_device.data(), m);
+
+    gpu::copy_to_host(c_device.data(), c, c_device.size());
+}
+
+#endif
+
+using value_type = double;
+using size_type  = size_t;
 
 template <typename T>
 bool equal(T* v1, T* v2, size_t len, double eps=1e-6) {
@@ -55,18 +83,18 @@ int main(int argc, char** argv){
     auto b_host = gpu::malloc_pinned<value_type>(K*N, 1);
     // C dimensions: MxN
     auto c_host = gpu::malloc_pinned<value_type>(M*N, 0);
-    auto c_host_xt = gpu::malloc_pinned<value_type>(M*N, 0);
+    auto c_host_reference = gpu::malloc_pinned<value_type>(M*N, 0);
 
     value_type alpha{1.};
     value_type beta{1.};
 
-    cublasXt_dgemm(a_host, b_host, c_host_xt, M, N, K, alpha, beta);
+    compute_reference(a_host, b_host, c_host_reference, M, N, K, alpha, beta);
 
     auto ctx = gpu::make_context<double>();
     // compute c = alpha * a * b + beta * c
     gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
 
-    bool correct = equal(c_host, c_host_xt, M*N);
+    bool correct = equal(c_host, c_host_reference, M*N);
 
     std::cout << "The result is " << (correct ? "CORRECT" : "NOT CORRECT") << std::endl;;
 

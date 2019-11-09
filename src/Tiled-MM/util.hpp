@@ -1,75 +1,37 @@
 #pragma once
 #include <iostream>
-#include <cublas_v2.h>
-#include <cuda_runtime_api.h>
 #include <string>
 #include <cmath>
-//#include <mutex>
+#include "gpu_runtime_api.hpp"
+#include "gpu_blas_api.hpp"
 
 namespace gpu {
 
-static const char* cudaGetErrorEnum(cublasStatus_t error)
-{
-    switch (error)
-    {
-        case CUBLAS_STATUS_SUCCESS:
-            return "CUBLAS_STATUS_SUCCESS";
-
-        case CUBLAS_STATUS_NOT_INITIALIZED:
-            return "CUBLAS_STATUS_NOT_INITIALIZED";
-
-        case CUBLAS_STATUS_ALLOC_FAILED:
-            return "CUBLAS_STATUS_ALLOC_FAILED";
-
-        case CUBLAS_STATUS_INVALID_VALUE:
-            return "CUBLAS_STATUS_INVALID_VALUE";
-
-        case CUBLAS_STATUS_ARCH_MISMATCH:
-            return "CUBLAS_STATUS_ARCH_MISMATCH";
-
-        case CUBLAS_STATUS_MAPPING_ERROR:
-            return "CUBLAS_STATUS_MAPPING_ERROR";
-
-        case CUBLAS_STATUS_EXECUTION_FAILED:
-            return "CUBLAS_STATUS_EXECUTION_FAILED";
-
-        case CUBLAS_STATUS_INTERNAL_ERROR:
-            return "CUBLAS_STATUS_INTERNAL_ERROR";
-
-        case CUBLAS_STATUS_NOT_SUPPORTED:
-            return "CUBLAS_STATUS_NOT_SUPPORTED";
-
-        case CUBLAS_STATUS_LICENSE_ERROR:
-            return "CUBLAS_STATUS_LICENSE_ERROR";
-    }
-
-    return "<unknown>";
-}
 ///////////////////////////////////////////////////////////////////////////////
 // CUDA error checking
 ///////////////////////////////////////////////////////////////////////////////
-static void cuda_check_status(cudaError_t status) {
-    if(status != cudaSuccess) {
-        std::cerr << "error: CUDA API call : "
-        << cudaGetErrorString(status) << std::endl;
-        throw(std::runtime_error("CUDA ERROR"));
+static void check_runtime_status(runtime_api::StatusType status) {
+    if(status !=  runtime_api::status::Success) {
+        std::cerr << "error: GPU API call : "
+        << runtime_api::get_error_string(status) << std::endl;
+        throw(std::runtime_error("GPU ERROR"));
     }
 }
 
-static void cublas_check_status(cublasStatus_t status) {
-    if(status != CUBLAS_STATUS_SUCCESS) {
-        auto error = cudaGetErrorEnum(status); 
-        std::cerr << "error: CUDABLAS API call: " << error << std::endl;
-        throw(std::runtime_error("CUDA ERROR"));
+static void check_blas_status(blas_api::StatusType status) {
+    if(status != blas_api::status::Success) {
+        auto error = blas_api::status::get_string(status); 
+        std::cerr << "error: BLAS API call: " << error << std::endl;
+        throw(std::runtime_error("GPU ERROR"));
     }
 }
 
-static void cuda_check_last_kernel(std::string const& errstr) {
-    auto status = cudaGetLastError();
-    if(status != cudaSuccess) {
-        std::cout << "error: CUDA kernel launch : " << errstr << " : "
-        << cudaGetErrorString(status) << std::endl;
-        throw(std::runtime_error("CUDA ERROR"));
+static void check_last_device_kernel(std::string const& errstr) {
+    auto status = runtime_api::get_last_error();
+    if(status != runtime_api::status::Success) {
+        std::cout << "error: GPU kernel launch : " << errstr << " : "
+        << runtime_api::get_error_string(status) << std::endl;
+        throw(std::runtime_error("GPU ERROR"));
     }
 }
 
@@ -78,13 +40,13 @@ static void cuda_check_last_kernel(std::string const& errstr) {
 ///////////////////////////////////////////////////////////////////////////////
 inline
 std::size_t gpu_allocated_memory() {
-    cudaDeviceSynchronize();
-    auto status = cudaGetLastError();
-    cuda_check_status(status);
+    runtime_api::device_synchronize();
+    auto status = runtime_api::get_last_error();
+    check_runtime_status(status);
     std::size_t free;
     std::size_t total;
-    status = cudaMemGetInfo(&free, &total);
-    return status == cudaSuccess ? total-free : -1;
+    status = runtime_api::mem_get_info(&free, &total);
+    return status == runtime_api::status::Success ? total-free : -1;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -95,26 +57,16 @@ std::size_t gpu_allocated_memory() {
 template <typename T>
 T* malloc_device(size_t n) {
     void* p;
-    auto status = cudaMalloc(&p, n*sizeof(T));
-    cuda_check_status(status);
+    auto status = runtime_api::malloc(&p, n*sizeof(T));
+    check_runtime_status(status);
     return (T*)p;
-}
-
-// allocate managed memory
-template <typename T>
-T* malloc_managed(size_t n, T value=T()) {
-    T* p;
-    auto status = cudaMallocManaged(&p, n*sizeof(T));
-    cuda_check_status(status);
-    std::fill(p, p+n, value);
-    return p;
 }
 
 template <typename T>
 T* malloc_pinned(size_t N, T value=T()) {
     T* ptr;
-    auto status = cudaHostAlloc((void**)&ptr, N*sizeof(T), 0);
-    cuda_check_status(status);
+    auto status = runtime_api::host_alloc((void**)&ptr, N*sizeof(T), 0);
+    check_runtime_status(status);
     std::fill(ptr, ptr+N, value);
     return ptr;
 }
@@ -125,14 +77,14 @@ T* malloc_pinned(size_t N, T value=T()) {
 
 // copy n*T from host to device
 template <typename T>
-void copy_to_device(T* from, T* to, size_t n) {
-    cudaMemcpy(to, from, n*sizeof(T), cudaMemcpyHostToDevice);
+void copy_to_device(const T* from, T* to, size_t n) {
+    runtime_api::memcpy(to, from, n*sizeof(T), runtime_api::flag::MemcpyHostToDevice);
 }
 
 // copy n*T from device to host
 template <typename T>
-void copy_to_host(T* from, T* to, size_t n) {
-    cudaMemcpy(to, from, n*sizeof(T), cudaMemcpyDeviceToHost);
+void copy_to_host(const T* from, T* to, size_t n) {
+    runtime_api::memcpy(to, from, n*sizeof(T), runtime_api::flag::MemcpyDeviceToHost);
 }
 
 // copy n*T from host to device
@@ -140,7 +92,7 @@ void copy_to_host(T* from, T* to, size_t n) {
 // asynchronously in the specified stream, otherwise it will be serialized in
 // the default (NULL) stream
 template <typename T>
-void copy_to_device_async(const T* from, T* to, size_t n, cudaStream_t stream=NULL) {
+void copy_to_device_async(const T* from, T* to, size_t n, runtime_api::StreamType stream=NULL) {
     //cudaDeviceSynchronize();
     // auto status = cudaGetLastError();
     // if(status != cudaSuccess) {
@@ -149,9 +101,9 @@ void copy_to_device_async(const T* from, T* to, size_t n, cudaStream_t stream=NU
     //    throw(std::runtime_error("CUDA ERROR"));
     //}
 
-    auto status =
-    cudaMemcpyAsync(to, from, n*sizeof(T), cudaMemcpyHostToDevice, stream);
-    cuda_check_status(status);
+    auto status = runtime_api::memcpy_async(to, from, n * sizeof(T),
+                                            runtime_api::flag::MemcpyHostToDevice, stream);
+    check_runtime_status(status);
 }
 
 // copy n*T from device to host
@@ -159,9 +111,9 @@ void copy_to_device_async(const T* from, T* to, size_t n, cudaStream_t stream=NU
 // asynchronously in the specified stream, otherwise it will be serialized in
 // the default (NULL) stream
 template <typename T>
-void copy_to_host_async(const T* from, T* to, size_t n, cudaStream_t stream=NULL) {
-    auto status =
-    cudaMemcpyAsync(to, from, n*sizeof(T), cudaMemcpyDeviceToHost, stream);
-    cuda_check_status(status);
+void copy_to_host_async(const T* from, T* to, size_t n, runtime_api::StreamType stream=NULL) {
+    auto status = runtime_api::memcpy_async(to, from, n * sizeof(T),
+                                            runtime_api::flag::MemcpyDeviceToHost, stream);
+    check_runtime_status(status);
 }
 }

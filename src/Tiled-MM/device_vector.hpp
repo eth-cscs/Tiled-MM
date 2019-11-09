@@ -1,5 +1,6 @@
 #pragma once
 #include "util.hpp"
+#include "gpu_runtime_api.hpp"
 
 namespace gpu {
 
@@ -46,8 +47,8 @@ template <typename T>
 device_vector<T>& device_vector<T>::operator=(device_vector<T>&& other) {
     if (this != &other) {
         if (this->data_) {
-            auto status = cudaFree(this->data_);
-            cuda_check_status(status);
+            auto status = runtime_api::free(this->data_);
+            check_runtime_status(status);
         }
         this->data_ = other.data_;
         other.data_ = nullptr;
@@ -69,7 +70,7 @@ std::size_t device_vector<T>::size() {
 template <typename T>
 device_vector<T>::~device_vector() {
     if (data_) {
-        cudaFree(data_);
+        runtime_api::free(data_);
     }
 }
 

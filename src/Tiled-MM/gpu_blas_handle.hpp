@@ -1,42 +1,44 @@
 #pragma once
 
 #include "util.hpp"
+#include "gpu_blas_api.hpp"
+#include "gpu_runtime_api.hpp"
 
 namespace gpu {
 // wrapper around cublasHandle
-class cublas_handle {
+class gpu_blas_handle {
 public:
-    cublas_handle() {
-        cudaSetDevice(0);
+    gpu_blas_handle() {
+        runtime_api::set_device(0);
         auto status = 
-        cublasCreate(&handle_);
-        cublas_check_status(status);
+        blas_api::create(&handle_);
+        check_blas_status(status);
         valid_ = true;
     }
 
-    ~cublas_handle() {
+    ~gpu_blas_handle() {
         if (valid_) {
             // std::cout << "freeing cublas handle" << std::endl;
             auto status =
-            cublasDestroy(handle_);
-            cublas_check_status(status);
+            blas_api::destroy(handle_);
+            check_blas_status(status);
         }
     }
 
     // move constructor
-    cublas_handle(cublas_handle&& other) {
+    gpu_blas_handle(gpu_blas_handle&& other) {
         handle_ = other.handle_;
         valid_ = other.valid_;
         other.valid_ = false;
     }
 
     // move-assignment operator
-    cublas_handle& operator=(cublas_handle&& other) {
+    gpu_blas_handle& operator=(gpu_blas_handle&& other) {
         if (this != &other) {
             if (valid_) {
                 auto status = 
-                cublasDestroy(handle_);
-                cublas_check_status(status);
+                blas_api::destroy(handle_);
+                check_blas_status(status);
             }
             handle_ = other.handle_;
             valid_ = other.valid_;
@@ -46,17 +48,17 @@ public:
     }
 
     // copy-constructor disabled
-    cublas_handle(cublas_handle&) = delete;
+    gpu_blas_handle(gpu_blas_handle&) = delete;
     // copy-operator disabled
-    cublas_handle& operator=(cublas_handle&) = delete;
+    gpu_blas_handle& operator=(gpu_blas_handle&) = delete;
 
     // return the unerlying cublas handle
-    cublasHandle_t handle() const {
+    blas_api::HandleType handle() const {
         return handle_;
     }
 
 private:
     bool valid_ = false;
-    cublasHandle_t handle_;
+    blas_api::HandleType handle_;
 };
 }

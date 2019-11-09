@@ -1,4 +1,5 @@
 #include "mm_handle.hpp"
+#include "gpu_runtime_api.hpp"
 
 #include<complex>
 #include <cmath>
@@ -10,7 +11,7 @@ template <typename Scalar>
 int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu, double allowance_ratio) {
     size_t free, total;
     // query available memory
-    cudaMemGetInfo(&free, &total);
+    runtime_api::mem_get_info(&free, &total);
 
     // use up to allowance_ratio % of the available memory
     // divide by 3, because 3 matrices A, B and C
@@ -28,7 +29,7 @@ int get_tile_size(int n_streams, int max_tile_size, int ranks_per_gpu, double al
 
 template <typename Scalar>
 mm_handle<Scalar>::mm_handle(int ranks_per_gpu, double allowance_ratio): ctx(n_streams) {
-    cudaSetDevice(0);
+    runtime_api::set_device(0);
 
     int tile_size = get_tile_size<Scalar>(n_streams, tile_size_m, ranks_per_gpu, allowance_ratio);
     tile_size_m = tile_size;
@@ -43,7 +44,7 @@ mm_handle<Scalar>::mm_handle(int ranks_per_gpu, double allowance_ratio): ctx(n_s
 template <typename Scalar>
 mm_handle<Scalar>::mm_handle(int streams, int tile_m, int tile_n, int tile_k): n_streams(streams),
         tile_size_m(tile_m), tile_size_n(tile_n), tile_size_k(tile_k), ctx(streams) {
-    cudaSetDevice(0);
+    runtime_api::set_device(0);
 
     a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
     b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});

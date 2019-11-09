@@ -1,8 +1,8 @@
 #pragma once
 #include "gpu_context.hpp"
 #include "device_buffer.hpp"
-#include "cuda_stream.hpp"
-#include "cublas_handle.hpp"
+#include "device_stream.hpp"
+#include "gpu_blas_handle.hpp"
 #include <tuple>
 #include <memory>
 

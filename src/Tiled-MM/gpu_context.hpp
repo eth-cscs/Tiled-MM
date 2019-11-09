@@ -1,7 +1,9 @@
 #pragma once
-#include "cublas_handle.hpp"
-#include "cuda_stream.hpp"
-#include "cuda_event.hpp"
+#include "gpu_blas_api.hpp"
+#include "gpu_blas_handle.hpp"
+#include "device_stream.hpp"
+#include "device_event.hpp"
+#include "gpu_runtime_api.hpp"
 #include <vector>
 #include <stdexcept>
 #include "util.hpp"
@@ -16,11 +18,11 @@ public:
     gpu_context(gpu_context&) = delete;
     // context& operator=(context&& other) = delete;
 
-    cublasHandle_t get_cublas_handle(int stream_id) const;
+    blas_api::HandleType get_blas_handle(int stream_id) const;
 
-    cudaStream_t get_cuda_stream(int stream_id) const;
+    runtime_api::StreamType get_device_stream(int stream_id) const;
 
-    cuda_event enqueue_event(int stream_id) const;
+    device_event enqueue_event(int stream_id) const;
 
     int get_num_streams() const;
     void set_num_streams(int streams);
@@ -29,8 +31,8 @@ public:
 
 private:
     int n_streams;
-    std::vector<cublas_handle> handles;
-    std::vector<cuda_stream> streams;
+    std::vector<gpu_blas_handle> handles;
+    std::vector<device_stream> streams;
 };
 
 }

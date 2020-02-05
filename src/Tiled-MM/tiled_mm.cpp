@@ -30,10 +30,10 @@ using zfloat = std::complex<float>;
 using zdouble = std::complex<double>;
 
 template<typename Scalar>
-void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
-        tile_coord tile, gpu_context& ctx, int stream_id) {
+void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer,
+        tile_coord tile, device_stream& stream) {
     Scalar* from = tiled_mat.tile_data(tile);
-    Scalar* to = d_buffer.stream_buffer(stream_id);
+    Scalar* to = d_buffer;
 
     tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
     // std::cout << "host->device" << std::endl;
@@ -42,14 +42,22 @@ void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Sc
     runtime_api::memcpy_2d_async(to, tile_dims.rows() * sizeof(Scalar),
             from, tiled_mat.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            runtime_api::flag::MemcpyHostToDevice, ctx.get_device_stream(stream_id));
+            runtime_api::flag::MemcpyHostToDevice, stream.stream());
     check_runtime_status(status);
 }
 
 template<typename Scalar>
-void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
+void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
         tile_coord tile, gpu_context& ctx, int stream_id) {
-    Scalar* from  = d_buffer.stream_buffer(stream_id);
+    copy_tile_to_device_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
+}
+
+template<typename Scalar>
+void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat,
+                             Scalar* d_buffer,
+                             tile_coord tile,
+                             device_stream& stream) {
+    Scalar* from  = d_buffer;
     Scalar* to = tiled_mat.tile_data(tile);
 
     tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
@@ -59,9 +67,16 @@ void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scal
     runtime_api::memcpy_2d_async(to, tiled_mat.rows() * sizeof(Scalar),
             from, tile_dims.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            runtime_api::flag::MemcpyDeviceToHost, ctx.get_device_stream(stream_id));
+            runtime_api::flag::MemcpyDeviceToHost, stream.stream());
     check_runtime_status(status);
 }
+
+template<typename Scalar>
+void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
+        tile_coord tile, gpu_context& ctx, int stream_id) {
+    copy_tile_to_host_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
+}
+
 
 template<typename Scalar>
 std::tuple<int, int, int> get_num_tiles(tiled_matrix<Scalar>& a, tiled_matrix<Scalar>& b, tiled_matrix<Scalar>& c) {
@@ -162,6 +177,11 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
     int n_streams = handle.get_num_streams();
     auto& gpu_ctx = handle.get_gpu_context();
 
+    auto& result_stream = gpu_ctx.get_result_stream();
+
+    std::vector<device_event> c_computed_on_device(n_streams);
+    std::vector<device_event> c_copied_to_device(n_streams);
+
     for (int i = 0; i < n_tiles_m * n_tiles_n; i += n_streams) {
         for (int k_tile_id = 0; k_tile_id < n_tiles_k; ++k_tile_id) {
             for (int round = 0; round < 2; ++round) {
@@ -180,6 +200,8 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
 
                     Scalar new_beta = k_tile_id == 0 ? beta : 1.0;
 
+                    auto& current_stream = gpu_ctx.get_device_stream(stream_id);
+
                     if (round == 0) {
                         // copy A tile
                         copy_tile_to_device_async(a_host, a_device,
@@ -192,7 +214,8 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                                 gpu_ctx, stream_id);
 
                         // copy C tile if this is the first partial result and beta > 0
-                        if (k_tile_id == 0 && beta != Scalar{0}) {
+                        if (k_tile_id == 0 && std::abs(beta) > 0) {
+                            current_stream.wait_on_event(c_copied_to_device[stream_id]);
                             copy_tile_to_device_async(c_host, c_device,
                                     {m_tile_id, n_tile_id},
                                     gpu_ctx, stream_id);
@@ -201,8 +224,10 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         // perform dgemm
                         // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
+                        auto& gemm_stream = gpu_ctx.get_device_stream(stream_id);
+                        gemm_stream.wait_on_event(c_copied_to_device[stream_id]);
                         auto status = cublas_gemm_wrapper(
-                                    gpu_ctx.get_blas_handle(stream_id),
+                                gpu_ctx.get_blas_handle(stream_id),
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
@@ -211,12 +236,15 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                                 c_device.stream_buffer(stream_id));
                         check_blas_status(status);
 
+                        c_computed_on_device[stream_id] = gemm_stream.enqueue_event();
 
                         if (k_tile_id == n_tiles_k - 1) {
                             // copy result back to host
-                            copy_tile_to_host_async(c_host, c_device,
+                            result_stream.wait_on_event(c_computed_on_device[stream_id]);
+                            copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
                                     {m_tile_id, n_tile_id},
-                                    gpu_ctx, stream_id);
+                                    result_stream);
+                            c_copied_to_device[stream_id] = gemm_stream.enqueue_event();
                         }
                     }
                     current_i++;

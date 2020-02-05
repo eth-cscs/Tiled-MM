@@ -12,7 +12,7 @@ gpu_context::gpu_context(int _streams): n_streams(_streams) {
         // let each stream use a separate cuBLAS handle
         // and let each handle be bound to a separate stream
         auto status=
-        blas_api::set_stream(get_blas_handle(stream_id), get_device_stream(stream_id));
+        blas_api::set_stream(get_blas_handle(stream_id), get_stream(stream_id));
         check_blas_status(status);
     }
 }
@@ -24,11 +24,18 @@ blas_api::HandleType gpu_context::get_blas_handle(int stream_id) const {
     return handles[stream_id].handle();
 }
 
-runtime_api::StreamType gpu_context::get_device_stream(int stream_id) const {
+runtime_api::StreamType gpu_context::get_stream(int stream_id) const {
     if (stream_id < 0 || stream_id >= n_streams) {
         throw std::runtime_error("index of gpu blas handle has to be in the range [0, n_streams)");
     }
     return streams[stream_id].stream();
+}
+
+device_stream& gpu_context::get_device_stream(int stream_id) {
+    if (stream_id < 0 || stream_id >= n_streams) {
+        throw std::runtime_error("index of gpu blas handle has to be in the range [0, n_streams)");
+    }
+    return streams[stream_id];
 }
 
 device_event gpu_context::enqueue_event(int stream_id) const {
@@ -43,6 +50,10 @@ void gpu_context::set_num_streams(int _streams) {
     n_streams = _streams;
     handles.resize(_streams);
     streams.resize(_streams);
+}
+
+device_stream& gpu_context::get_result_stream() {
+    return result_stream;
 }
 
 gpu_context::~gpu_context() {

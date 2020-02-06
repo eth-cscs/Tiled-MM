@@ -36,9 +36,9 @@ public:
 
 private:
     int n_streams = 2;
-    int tile_size_m = 4352;
-    int tile_size_n = 4352;
-    int tile_size_k = 3392;
+    int tile_size_m = 4096;
+    int tile_size_n = 4096;
+    int tile_size_k = 4096;
 
     gpu_context ctx;
 

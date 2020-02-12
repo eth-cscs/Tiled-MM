@@ -174,7 +174,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
     int n_tiles_m, n_tiles_n, n_tiles_k;
     std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
 
-    int n_streams = handle.get_num_streams();
+    int n_streams = std::min(handle.get_num_streams(), n_tiles_m * n_tiles_n);
     auto& gpu_ctx = handle.get_gpu_context();
 
     auto& result_stream = gpu_ctx.get_result_stream();

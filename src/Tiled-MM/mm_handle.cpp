@@ -39,6 +39,10 @@ mm_handle<Scalar>::mm_handle(int ranks_per_gpu, double allowance_ratio): ctx(n_s
     a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
     b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
     c_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
+
+    a_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
+    b_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
+    c_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
 }
 
 template <typename Scalar>
@@ -49,6 +53,10 @@ mm_handle<Scalar>::mm_handle(int streams, int tile_m, int tile_n, int tile_k): n
     a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
     b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
     c_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
+
+    a_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
+    b_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
+    c_pinned = pinned_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
 }
 
 template <typename Scalar>
@@ -64,6 +72,10 @@ void mm_handle<Scalar>::set_num_streams(int streams) {
     a_buff.set_num_streams(streams);
     b_buff.set_num_streams(streams);
     c_buff.set_num_streams(streams);
+
+    a_pinned.set_num_streams(streams);
+    b_pinned.set_num_streams(streams);
+    c_pinned.set_num_streams(streams);
 }
 
 template <typename Scalar>
@@ -85,6 +97,10 @@ void mm_handle<Scalar>::set_tile_sizes(int tile_m, int tile_n, int tile_k) {
     a_buff.set_tile_dimensions({tile_m, tile_k});
     b_buff.set_tile_dimensions({tile_k, tile_n});
     c_buff.set_tile_dimensions({tile_m, tile_n});
+
+    a_pinned.set_tile_dimensions({tile_m, tile_k});
+    b_pinned.set_tile_dimensions({tile_k, tile_n});
+    c_pinned.set_tile_dimensions({tile_m, tile_n});
 }
 
 template <typename Scalar>
@@ -108,6 +124,10 @@ void mm_handle<Scalar>::set_streams_and_tiles(int streams, int tile_m, int tile_
     a_buff.set_streams_and_tiles(streams, {tile_m, tile_k});
     b_buff.set_streams_and_tiles(streams, {tile_k, tile_n});
     c_buff.set_streams_and_tiles(streams, {tile_m, tile_n});
+
+    a_pinned.set_streams_and_tiles(streams, {tile_m, tile_k});
+    b_pinned.set_streams_and_tiles(streams, {tile_k, tile_n});
+    c_pinned.set_streams_and_tiles(streams, {tile_m, tile_n});
 }
 
 template <typename Scalar>
@@ -123,6 +143,19 @@ device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_b() {
 template <typename Scalar>
 device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_c() {
     return c_buff;
+}
+
+template <typename Scalar>
+pinned_buffer<Scalar>& mm_handle<Scalar>::get_pinned_buffer_a() {
+    return a_pinned;
+}
+template <typename Scalar>
+pinned_buffer<Scalar>& mm_handle<Scalar>::get_pinned_buffer_b() {
+    return b_pinned;
+}
+template <typename Scalar>
+pinned_buffer<Scalar>& mm_handle<Scalar>::get_pinned_buffer_c() {
+    return c_pinned;
 }
 
 template class mm_handle<float>;

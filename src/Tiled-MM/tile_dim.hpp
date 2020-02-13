@@ -6,9 +6,9 @@ public:
     tile_dim() = default;
     tile_dim(int n_rows, int n_cols);
 
-    int rows();
+    int rows() const;
 
-    int cols();
+    int cols() const;
 
     void set_rows(int n_rows);
 

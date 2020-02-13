@@ -2,6 +2,7 @@
 #include "gpu_context.hpp"
 #include "device_buffer.hpp"
 #include "device_stream.hpp"
+#include "pinned_buffer.hpp"
 #include "gpu_blas_handle.hpp"
 #include <tuple>
 #include <memory>
@@ -34,6 +35,10 @@ public:
     device_buffer<Scalar>& get_device_buffer_b();
     device_buffer<Scalar>& get_device_buffer_c();
 
+    pinned_buffer<Scalar>& get_pinned_buffer_a();
+    pinned_buffer<Scalar>& get_pinned_buffer_b();
+    pinned_buffer<Scalar>& get_pinned_buffer_c();
+
 private:
     int n_streams = 2;
     int tile_size_m = 4096;
@@ -45,6 +50,10 @@ private:
     device_buffer<Scalar> a_buff;
     device_buffer<Scalar> b_buff;
     device_buffer<Scalar> c_buff;
+
+    pinned_buffer<Scalar> a_pinned;
+    pinned_buffer<Scalar> b_pinned;
+    pinned_buffer<Scalar> c_pinned;
 };
 
 template <typename Scalar>

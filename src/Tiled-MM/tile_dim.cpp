@@ -7,11 +7,11 @@ tile_dim::tile_dim(int n_rows, int n_cols):
     size_ = n_rows * n_cols;
 }
 
-int tile_dim::rows() {
+int tile_dim::rows() const {
     return n_rows_;
 }
 
-int tile_dim::cols() {
+int tile_dim::cols() const {
     return n_cols_;
 }
 

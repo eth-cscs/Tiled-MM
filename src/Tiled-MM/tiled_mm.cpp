@@ -29,54 +29,108 @@ namespace gpu {
 using zfloat = std::complex<float>;
 using zdouble = std::complex<double>;
 
+// copies n entries of elem_type from src_ptr to desc_ptr
+template <typename elem_type>
+void copy(std::size_t n, const elem_type *src_ptr, elem_type *dest_ptr) {
+    static_assert(std::is_trivially_copyable<elem_type>(),
+                  "Element type must be trivially copyable!");
+    std::memcpy(dest_ptr, src_ptr, sizeof(elem_type) * n);
+}
+// copies 2D block of given size from src_ptr with stride ld_src
+// to dest_ptr with stride ld_dest
+template <class elem_type>
+void copy2D(const tile_dim &block_dim,
+            const elem_type *src_ptr,
+            int ld_src,
+            elem_type *dest_ptr,
+            int ld_dest) {
+    static_assert(std::is_trivially_copyable<elem_type>(),
+                  "Element type must be trivially copyable!");
+    auto block_size = block_dim.rows() * block_dim.cols();
+    // std::cout << "invoking copy2D." << std::endl;
+    if (!block_size) {
+        return;
+    }
+
+    // if not strided, copy in a single piece
+    if (block_dim.rows() == (size_t)ld_src &&
+        block_dim.rows() == (size_t)ld_dest) {
+        copy(block_size, src_ptr, dest_ptr);
+    } else {
+        for (size_t col = 0; col < block_dim.cols(); ++col) {
+            copy(block_dim.rows(),
+                 src_ptr + ld_src * col,
+                 dest_ptr + ld_dest * col);
+        }
+    }
+}
+
 template<typename Scalar>
-void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer,
-        tile_coord tile, device_stream& stream) {
+void copy_tile_to_pinned_buffer(
+        tiled_matrix<Scalar>& tiled_mat, 
+        Scalar* pinned_buff,
+        tile_coord tile) {
     Scalar* from = tiled_mat.tile_data(tile);
-    Scalar* to = d_buffer;
+    Scalar* to = pinned_buff;
 
     tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
-    // std::cout << "host->device" << std::endl;
+    copy2D<Scalar>(tile_dims, from, tiled_mat.rows(), to, tile_dims.rows());
 
-    auto status=
-    runtime_api::memcpy_2d_async(to, tile_dims.rows() * sizeof(Scalar),
-            from, tiled_mat.rows() * sizeof(Scalar),
-            tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            runtime_api::flag::MemcpyHostToDevice, stream.stream());
-    check_runtime_status(status);
+    std::cout << "pinned_buffer content = " << std::endl;
+    for (int i = 0; i < tile_dims.rows() * tile_dims.cols(); ++i) {
+        std::cout << to[i] << ", ";
+    }
+    std::cout << std::endl;
 }
 
 template<typename Scalar>
-void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
-        tile_coord tile, gpu_context& ctx, int stream_id) {
-    copy_tile_to_device_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
-}
-
-template<typename Scalar>
-void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat,
-                             Scalar* d_buffer,
-                             tile_coord tile,
-                             device_stream& stream) {
-    Scalar* from  = d_buffer;
+void copy_tile_from_pinned_buffer(
+        Scalar* pinned_buff,
+        tiled_matrix<Scalar>& tiled_mat, 
+        tile_coord tile) {
+    Scalar* from = pinned_buff;
     Scalar* to = tiled_mat.tile_data(tile);
 
     tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
-
-    // std::cout << "device->host" << std::endl;
-    auto status=
-    runtime_api::memcpy_2d_async(to, tiled_mat.rows() * sizeof(Scalar),
-            from, tile_dims.rows() * sizeof(Scalar),
-            tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
-            runtime_api::flag::MemcpyDeviceToHost, stream.stream());
-    check_runtime_status(status);
+    copy2D<Scalar>(tile_dims, from, tile_dims.rows(), to, tiled_mat.rows());
 }
 
 template<typename Scalar>
-void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
-        tile_coord tile, gpu_context& ctx, int stream_id) {
-    copy_tile_to_host_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
+void copy_tile_to_device_async(
+        Scalar* pinned_buff,
+        Scalar* d_buffer,
+        tiled_matrix<Scalar>& tiled_mat,
+        tile_coord tile,
+        runtime_api::StreamType stream) {
+    Scalar* from = pinned_buff;
+    Scalar* to = d_buffer;
+    tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
+    copy_to_device_async(from, to, tile_dims.size(), stream);
+    std::cout << "copying to device buffer the following: " << std::endl;
+    for (int i = 0; i < tile_dims.size(); ++i) {
+        std::cout << from[i] << ", ";
+    }
+    std::cout << std::endl;
 }
 
+template<typename Scalar>
+void copy_tile_to_host_async(
+        Scalar* d_buffer,
+        Scalar* pinned_buff,
+        tiled_matrix<Scalar>& tiled_mat,
+        tile_coord tile,
+        runtime_api::StreamType stream) {
+    Scalar* from = d_buffer;
+    Scalar* to  = pinned_buff;
+    tile_dim tile_dims = tiled_mat.tile_dimensions(tile);
+    copy_to_host_async(from, to, tile_dims.size(), stream);
+    runtime_api::device_synchronize();
+    std::cout << "host buffer content: " << std::endl;
+    for (int i = 0; i < tile_dims.size(); ++i) {
+        std::cout << to[i] << ", ";
+    }
+    std::cout << std::endl;
+}
 
 template<typename Scalar>
 std::tuple<int, int, int> get_num_tiles(tiled_matrix<Scalar>& a, tiled_matrix<Scalar>& b, tiled_matrix<Scalar>& c) {
@@ -165,26 +219,58 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
 }
 
 template<typename Scalar>
-void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, tiled_matrix<Scalar>& c_host,
+void round_robin(
+        // host buffers (not pinned)
+        tiled_matrix<Scalar>& a_host,
+        tiled_matrix<Scalar>& b_host,
+        tiled_matrix<Scalar>& c_host,
+        // pinned host buffers
+        pinned_buffer<Scalar>& a_pinned,
+        pinned_buffer<Scalar>& b_pinned,
+        pinned_buffer<Scalar>& c_pinned,
+        // device buffers
         device_buffer<Scalar>& a_device,
         device_buffer<Scalar>& b_device,
         device_buffer<Scalar>& c_device,
+        // gemm parameters
         int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
 
     int n_tiles_m, n_tiles_n, n_tiles_k;
     std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
 
-    int n_streams = handle.get_num_streams();
+    int n_streams = std::min(handle.get_num_streams(), n_tiles_n * n_tiles_m);
     auto& gpu_ctx = handle.get_gpu_context();
 
     auto& result_stream = gpu_ctx.get_result_stream();
-
     std::vector<device_event> c_computed_on_device(n_streams);
     std::vector<device_event> c_copied_to_device(n_streams);
 
+    // copy the first tile to pinned buffers immediately
+    // copy tile {0, 0} from host->pinned buffers(0th stream, 0th tile within stream)
+    for (int i = 0; i < n_streams; ++i) {
+        int m_tile_id = i / n_tiles_n;
+        int n_tile_id = i % n_tiles_n;
+
+        std::cout << "initial copy A" << std::endl;
+        copy_tile_to_pinned_buffer(a_host, a_pinned.buffer(i), {m_tile_id, 0});
+        std::cout << "initial copy B" << std::endl;
+        copy_tile_to_pinned_buffer(b_host, b_pinned.buffer(i), {0, n_tile_id});
+        if (std::abs(beta) > 0) {
+            std::cout << "initial copy C" << std::endl;
+            copy_tile_to_pinned_buffer(c_host, c_pinned.buffer(i), {m_tile_id, n_tile_id});
+        }
+    }
+
+    // start tiling
     for (int i = 0; i < n_tiles_m * n_tiles_n; i += n_streams) {
         for (int k_tile_id = 0; k_tile_id < n_tiles_k; ++k_tile_id) {
-            for (int round = 0; round < 2; ++round) {
+            int n_rounds = 3;
+            // if this is the last tile, then there is no 
+            // copying host->pinned, thus we have only 2 rounds
+            if (i == n_tiles_m * n_tiles_n - 1 && k_tile_id == n_tiles_k - 1) {
+                n_rounds = 2;
+            }
+            for (int round = 0; round < n_rounds; ++round) {
                 int current_i = i;
 
                 for (int stream_id = 0; stream_id < n_streams
@@ -204,23 +290,45 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
 
                     if (round == 0) {
                         // copy A tile
-                        copy_tile_to_device_async(a_host, a_device,
+                        copy_tile_to_device_async(
+                                a_pinned.buffer(stream_id),
+                                a_device.stream_buffer(stream_id),
+                                a_host,
                                 {m_tile_id, k_tile_id},
-                                gpu_ctx, stream_id);
+                                current_stream.stream());
+                        auto a_copied_to_device = current_stream.enqueue_event();
+                        a_pinned.record_event(stream_id, std::move(a_copied_to_device));
+                        // A tile in pinned memory is now completely finished
+                        // so we can move to the next pinned buffer
+                        a_pinned.advance_buffer(stream_id);
 
                         // copy B tile
-                        copy_tile_to_device_async(b_host, b_device,
+                        copy_tile_to_device_async(
+                                b_pinned.buffer(stream_id),
+                                b_device.stream_buffer(stream_id),
+                                b_host,
                                 {k_tile_id, n_tile_id},
-                                gpu_ctx, stream_id);
+                                current_stream.stream());
+                        auto b_copied_to_device = current_stream.enqueue_event();
+                        b_pinned.record_event(stream_id, std::move(b_copied_to_device));
+                        // B tile in pinned memory is now completely finished
+                        // so we can move to the next pinned buffer
+                        b_pinned.advance_buffer(stream_id);
 
                         // copy C tile if this is the first partial result and beta > 0
+                        // for C, we still cannot move the pinned buffer, since
+                        // we want to copy the result back into this pinned memory
+                        // once the computation is finished
                         if (k_tile_id == 0 && std::abs(beta) > 0) {
                             current_stream.wait_on_event(c_copied_to_device[stream_id]);
-                            copy_tile_to_device_async(c_host, c_device,
+                            copy_tile_to_device_async(
+                                    c_pinned.buffer(stream_id),
+                                    c_device.stream_buffer(stream_id),
+                                    c_host,
                                     {m_tile_id, n_tile_id},
-                                    gpu_ctx, stream_id);
+                                    current_stream.stream());
                         }
-                    } else {
+                    } else if (round == 1) {
                         // perform dgemm
                         // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
@@ -241,10 +349,49 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         if (k_tile_id == n_tiles_k - 1) {
                             // copy result back to host
                             result_stream.wait_on_event(c_computed_on_device[stream_id]);
-                            copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
+                            // c_pinned.wait_buffer(stream_id);
+                            copy_tile_to_host_async(
+                                    c_device.stream_buffer(stream_id),
+                                    c_pinned.buffer(stream_id),
+                                    c_host,
                                     {m_tile_id, n_tile_id},
-                                    result_stream);
+                                    result_stream.stream());
                             c_copied_to_device[stream_id] = gemm_stream.enqueue_event();
+                            auto event = gemm_stream.enqueue_event();
+                            c_pinned.record_event(stream_id, std::move(event));
+                            c_pinned.advance_buffer(stream_id);
+                        }
+                    } else {
+                        // copy the next tile to pinned buffers
+                        // unless this is the last tile
+                        int next_m_tile_id = m_tile_id;
+                        int next_n_tile_id = n_tile_id;
+                        int next_k_tile_id = k_tile_id;
+
+                        if (k_tile_id + 1 < n_tiles_k) {
+                            next_k_tile_id = k_tile_id + 1;
+                        } else {
+                            next_k_tile_id = 0;
+                            next_m_tile_id = (current_i + n_streams) / n_tiles_n;
+                            next_n_tile_id = (current_i + n_streams) % n_tiles_n;
+                        }
+
+                        Scalar new_beta = next_k_tile_id == 0 ? beta : 1.0;
+
+                        a_pinned.wait_buffer(stream_id);
+                        copy_tile_to_pinned_buffer(a_host, 
+                                                   a_pinned.buffer(stream_id), 
+                                                   {next_m_tile_id, next_k_tile_id});
+                        b_pinned.wait_buffer(stream_id);
+                        copy_tile_to_pinned_buffer(b_host, 
+                                                   b_pinned.buffer(stream_id), 
+                                                   {next_k_tile_id, next_n_tile_id});
+                        if (std::abs(new_beta) > 0) {
+                            c_pinned.wait_buffer(stream_id);
+                            copy_tile_from_pinned_buffer(c_pinned.buffer(stream_id), c_host, {m_tile_id, n_tile_id});
+                            copy_tile_to_pinned_buffer(c_host, 
+                                                       c_pinned.buffer(stream_id), 
+                                                       {next_m_tile_id, next_n_tile_id});
                         }
                     }
                     current_i++;
@@ -307,7 +454,12 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
     device_buffer<Scalar>& b_device = handle.get_device_buffer_b();
     device_buffer<Scalar>& c_device = handle.get_device_buffer_c();
 
+    pinned_buffer<Scalar>& a_pinned = handle.get_pinned_buffer_a();
+    pinned_buffer<Scalar>& b_pinned = handle.get_pinned_buffer_b();
+    pinned_buffer<Scalar>& c_pinned = handle.get_pinned_buffer_c();
+
     round_robin(a_host, b_host, c_host,
+                a_pinned, b_pinned, c_pinned,
                 a_device, b_device, c_device,
                 m, n, k, alpha, beta, handle);
 

@@ -16,7 +16,7 @@ class device_event {
     }
 
     ~device_event() {
-        // note that EventDestroy can be called on an device_event before is has
+        // note that EventDestroy can be called on a device_event before is has
         // been reached in a stream, and the GPU runtime will defer clean up
         // of the device_event until it has been completed.
         if (valid_) {

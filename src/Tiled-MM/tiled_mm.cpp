@@ -6,7 +6,7 @@
 #include "gpu_blas_handle.hpp"
 #include "tile_coord.hpp"
 #include "gpu_context.hpp"
-#include "device_buffer.hpp"
+#include "device_2d_buffer.hpp"
 #include "tiled_matrix.hpp"
 #include "tile_coord.hpp"
 #include "gpu_blas_api.hpp"
@@ -30,7 +30,10 @@ using zfloat = std::complex<float>;
 using zdouble = std::complex<double>;
 
 template<typename Scalar>
-void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer,
+void copy_tile_to_device_async(
+        tiled_matrix<Scalar>& tiled_mat, 
+        Scalar* d_buffer,
+        std::size_t d_buffer_pitch,
         tile_coord tile, device_stream& stream) {
     Scalar* from = tiled_mat.tile_data(tile);
     Scalar* to = d_buffer;
@@ -39,7 +42,7 @@ void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer
     // std::cout << "host->device" << std::endl;
 
     auto status=
-    runtime_api::memcpy_2d_async(to, tile_dims.rows() * sizeof(Scalar),
+    runtime_api::memcpy_2d_async(to, d_buffer_pitch,
             from, tiled_mat.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
             runtime_api::flag::MemcpyHostToDevice, stream.stream());
@@ -47,14 +50,23 @@ void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer
 }
 
 template<typename Scalar>
-void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
+void copy_tile_to_device_async(
+        tiled_matrix<Scalar>& tiled_mat, 
+        device_2d_buffer<Scalar>& d_buffer,
+        std::size_t d_buffer_pitch,
         tile_coord tile, gpu_context& ctx, int stream_id) {
-    copy_tile_to_device_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
+    copy_tile_to_device_async(
+            tiled_mat, 
+            d_buffer.stream_buffer(stream_id), 
+            d_buffer_pitch, 
+            tile, 
+            ctx.get_device_stream(stream_id));
 }
 
 template<typename Scalar>
 void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat,
                              Scalar* d_buffer,
+                             std::size_t d_buffer_pitch,
                              tile_coord tile,
                              device_stream& stream) {
     Scalar* from  = d_buffer;
@@ -65,14 +77,17 @@ void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat,
     // std::cout << "device->host" << std::endl;
     auto status=
     runtime_api::memcpy_2d_async(to, tiled_mat.rows() * sizeof(Scalar),
-            from, tile_dims.rows() * sizeof(Scalar),
+            from, d_buffer_pitch,
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
             runtime_api::flag::MemcpyDeviceToHost, stream.stream());
     check_runtime_status(status);
 }
 
 template<typename Scalar>
-void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scalar>& d_buffer,
+void copy_tile_to_host_async(
+        tiled_matrix<Scalar>& tiled_mat, 
+        device_2d_buffer<Scalar>& d_buffer,
+        std::size_t d_buffer_pitch,
         tile_coord tile, gpu_context& ctx, int stream_id) {
     copy_tile_to_host_async(tiled_mat, d_buffer.stream_buffer(stream_id), tile, ctx.get_device_stream(stream_id));
 }
@@ -100,7 +115,7 @@ std::tuple<int, int, int> get_tile_sizes(tiled_matrix<Scalar>& a,
     if (a_dim.cols() != b_dim.rows() ||
             a_dim.rows() != c_dim.rows() ||
             b_dim.cols() != c_dim.cols()) {
-        throw std::runtime_error("Tile dimension mismatch in device_buffers inside get_tile_sizes.");
+        throw std::runtime_error("Tile dimension mismatch in device_2d_buffers inside get_tile_sizes.");
     }
     return {a_dim.rows(), b_dim.cols(), a_dim.cols()};
 }
@@ -164,11 +179,80 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                          reinterpret_cast<blas_api::ComplexDoubleType*>(c), m);
 }
 
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+                                   int m, int n, int k,
+                                   const float* alpha,
+                                   const float* a,
+                                   const int lld_a,
+                                   const float* b,
+                                   const int lld_b,
+                                   const float* beta,
+                                   float* c,
+                                   const int lld_c) {
+  return blas_api::sgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         alpha, a, lld_a, b, lld_b, beta, c, lld_c);
+}
+
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+                                   int m, int n, int k,
+                                   const double* alpha,
+                                   const double* a,
+                                   const int lld_a,
+                                   const double* b,
+                                   const int lld_b,
+                                   const double* beta,
+                                   double* c,
+                                   const int lld_c) {
+  return blas_api::dgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         alpha, a, lld_a, b, lld_b, beta, c, lld_c);
+}
+
+// Note: Converting from std::complex to cuComplex and cuDoubleComple
+//       works because they are binary compatible.
+//
+//       http://icl.cs.utk.edu/magma/forum/viewtopic.php?f=2&t=902
+//
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+                                   int m, int n, int k,
+                                   const zfloat* alpha,
+                                   const zfloat* a,
+                                   const int lld_a,
+                                   const zfloat* b,
+                                   const int lld_b,
+                                   const zfloat* beta,
+                                   zfloat* c,
+                                   const int lld_c) {
+  return blas_api::cgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(alpha),
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(a), lld_a,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(b), lld_b,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(beta),
+                         reinterpret_cast<blas_api::ComplexFloatType*>(c), lld_c);
+}
+
+blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+                                   int m, int n, int k,
+                                   const zdouble* alpha,
+                                   const zdouble* a,
+                                   const int lld_a,
+                                   const zdouble* b,
+                                   const int lld_b,
+                                   const zdouble* beta,
+                                   zdouble* c,
+                                   const int lld_c) {
+  return blas_api::zgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(alpha),
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(a), lld_a,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(b), lld_b,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(beta),
+                         reinterpret_cast<blas_api::ComplexDoubleType*>(c), lld_c);
+}
+
 template<typename Scalar>
 void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, tiled_matrix<Scalar>& c_host,
-        device_buffer<Scalar>& a_device,
-        device_buffer<Scalar>& b_device,
-        device_buffer<Scalar>& c_device,
+        device_2d_buffer<Scalar>& a_device,
+        device_2d_buffer<Scalar>& b_device,
+        device_2d_buffer<Scalar>& c_device,
         int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
 
     int n_tiles_m, n_tiles_n, n_tiles_k;
@@ -205,11 +289,13 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                     if (round == 0) {
                         // copy A tile
                         copy_tile_to_device_async(a_host, a_device,
+                                a_device.pitch(),
                                 {m_tile_id, k_tile_id},
                                 gpu_ctx, stream_id);
 
                         // copy B tile
                         copy_tile_to_device_async(b_host, b_device,
+                                b_device.pitch(),
                                 {k_tile_id, n_tile_id},
                                 gpu_ctx, stream_id);
 
@@ -217,6 +303,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         if (k_tile_id == 0 && std::abs(beta) > 0) {
                             current_stream.wait_on_event(c_copied_to_device[stream_id]);
                             copy_tile_to_device_async(c_host, c_device,
+                                    c_device.pitch(),
                                     {m_tile_id, n_tile_id},
                                     gpu_ctx, stream_id);
                         }
@@ -230,10 +317,10 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                                 gpu_ctx.get_blas_handle(stream_id),
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
-                                a_device.stream_buffer(stream_id),
-                                b_device.stream_buffer(stream_id),
+                                a_device.stream_buffer(stream_id), a_device.pitch()/sizeof(Scalar),
+                                b_device.stream_buffer(stream_id), b_device.pitch()/sizeof(Scalar),
                                 &new_beta,
-                                c_device.stream_buffer(stream_id));
+                                c_device.stream_buffer(stream_id), c_device.pitch()/sizeof(Scalar));
                         check_blas_status(status);
 
                         c_computed_on_device[stream_id] = gemm_stream.enqueue_event();
@@ -242,6 +329,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                             // copy result back to host
                             result_stream.wait_on_event(c_computed_on_device[stream_id]);
                             copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
+                                    c_device.pitch(),
                                     {m_tile_id, n_tile_id},
                                     result_stream);
                             c_copied_to_device[stream_id] = gemm_stream.enqueue_event();
@@ -303,9 +391,9 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
     tiled_matrix<Scalar> b_host(b, k, n, {tile_size_k, tile_size_n});
     tiled_matrix<Scalar> c_host(c, m, n, {tile_size_m, tile_size_n});
 
-    device_buffer<Scalar>& a_device = handle.get_device_buffer_a();
-    device_buffer<Scalar>& b_device = handle.get_device_buffer_b();
-    device_buffer<Scalar>& c_device = handle.get_device_buffer_c();
+    device_2d_buffer<Scalar>& a_device = handle.get_device_buffer_a();
+    device_2d_buffer<Scalar>& b_device = handle.get_device_buffer_b();
+    device_2d_buffer<Scalar>& c_device = handle.get_device_buffer_c();
 
     round_robin(a_host, b_host, c_host,
                 a_device, b_device, c_device,

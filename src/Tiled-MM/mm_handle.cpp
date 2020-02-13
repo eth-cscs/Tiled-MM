@@ -36,9 +36,9 @@ mm_handle<Scalar>::mm_handle(int ranks_per_gpu, double allowance_ratio): ctx(n_s
     tile_size_n = tile_size;
     tile_size_k = tile_size;
 
-    a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
-    b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
-    c_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
+    a_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
+    b_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
+    c_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
 }
 
 template <typename Scalar>
@@ -46,9 +46,9 @@ mm_handle<Scalar>::mm_handle(int streams, int tile_m, int tile_n, int tile_k): n
         tile_size_m(tile_m), tile_size_n(tile_n), tile_size_k(tile_k), ctx(streams) {
     runtime_api::set_device(0);
 
-    a_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
-    b_buff = device_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
-    c_buff = device_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
+    a_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_m, tile_size_k});
+    b_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_k, tile_size_n});
+    c_buff = device_2d_buffer<Scalar>(n_streams, {tile_size_m, tile_size_n});
 }
 
 template <typename Scalar>
@@ -111,17 +111,17 @@ void mm_handle<Scalar>::set_streams_and_tiles(int streams, int tile_m, int tile_
 }
 
 template <typename Scalar>
-device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_a() {
+device_2d_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_a() {
     return a_buff;
 }
 
 template <typename Scalar>
-device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_b() {
+device_2d_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_b() {
     return b_buff;
 }
 
 template <typename Scalar>
-device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_c() {
+device_2d_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_c() {
     return c_buff;
 }
 

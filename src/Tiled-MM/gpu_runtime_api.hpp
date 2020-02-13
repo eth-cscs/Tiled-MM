@@ -161,6 +161,11 @@ inline auto malloc(ARGS... args) -> StatusType {
 }
 
 template <typename... ARGS>
+inline auto malloc_pitch(ARGS... args) -> StatusType {
+  return GPU_PREFIX(MallocPitch)(std::forward<ARGS>(args)...);
+}
+
+template <typename... ARGS>
 inline auto host_alloc(ARGS... args) -> StatusType {
 #ifdef TILED_MM_CUDA
   return cudaHostAlloc(std::forward<ARGS>(args)...);

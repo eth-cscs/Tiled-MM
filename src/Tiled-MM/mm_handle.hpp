@@ -1,6 +1,6 @@
 #pragma once
 #include "gpu_context.hpp"
-#include "device_buffer.hpp"
+#include "device_2d_buffer.hpp"
 #include "device_stream.hpp"
 #include "gpu_blas_handle.hpp"
 #include <tuple>
@@ -30,9 +30,9 @@ public:
 
     void set_streams_and_tiles(int streams, int tile_size_m, int tile_size_n, int tile_size_k);
 
-    device_buffer<Scalar>& get_device_buffer_a();
-    device_buffer<Scalar>& get_device_buffer_b();
-    device_buffer<Scalar>& get_device_buffer_c();
+    device_2d_buffer<Scalar>& get_device_buffer_a();
+    device_2d_buffer<Scalar>& get_device_buffer_b();
+    device_2d_buffer<Scalar>& get_device_buffer_c();
 
 private:
     int n_streams = 2;
@@ -42,9 +42,9 @@ private:
 
     gpu_context ctx;
 
-    device_buffer<Scalar> a_buff;
-    device_buffer<Scalar> b_buff;
-    device_buffer<Scalar> c_buff;
+    device_2d_buffer<Scalar> a_buff;
+    device_2d_buffer<Scalar> b_buff;
+    device_2d_buffer<Scalar> c_buff;
 };
 
 template <typename Scalar>

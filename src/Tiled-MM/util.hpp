@@ -52,6 +52,14 @@ std::size_t gpu_allocated_memory() {
 ///////////////////////////////////////////////////////////////////////////////
 // allocating memory
 ///////////////////////////////////////////////////////////////////////////////
+// allocate pitched space on GPU for n instances of type T
+template <typename T>
+T* malloc_pitch_device(std::size_t n_rows, std::size_t n_cols, std::size_t* pitch) {
+    void* p;
+    auto status = runtime_api::malloc_pitch(&p, pitch, n_cols*sizeof(T), n_rows);
+    check_runtime_status(status);
+    return (T*)p;
+}
 
 // allocate space on GPU for n instances of type T
 template <typename T>

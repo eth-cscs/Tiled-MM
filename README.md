@@ -13,14 +13,15 @@ In the benchmark, we used double precision, square matrices given in `column-maj
 ## Features:
 
 - The user can specify the tile size of each dimension separately.
-- The user can specify the number of CUDA streams to be used.
+- The user can specify the number of streams to be used.
 - The user can reuse the same context (and thus the same device memory) for many multiplications which can lead to significant performance improvements.
+- Fully templatized, supporting arbitrary data types.
+- Ported to both `NVIDIA` and `AMD` GPUs.
 
 ## Limitations
 
 These are just current limitations which are planned to be handled in some future release.
 - At the moment supports only the column-major ordering of `A, B` and `C`, but this can be easily improved.
-- At the moment, only double precision is supported
 
 ## Building and Installing
 
@@ -54,12 +55,16 @@ double alpha = 1.0;
 double beta = 1.0;
 
 // preallocates device buffers and other CUDA stuff
+// the context does not have to be created explicitly
+// so the user can omit this part
 auto ctx = gpu::make_context();
 
 // compute c = alpha * a * b + beta * c
+// There is also a version without ctx, in case the user
+// does not want to create the context explicitly
 gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
 ```
-When creating context, a user can specify tile dimensions and the number of streams to be used as:
+When creating the context, the user can specify tile dimensions and the number of streams to be used as:
 ```cpp
 int tile_size_m = 4000;
 int tile_size_n = 4000;

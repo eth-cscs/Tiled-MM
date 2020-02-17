@@ -4,11 +4,10 @@ This is a library for multiplying matrices on GPU. As opposed to NVIDIA's `cubla
 
 ## Performance
 
-When tested on `P100` GPU against NVIDIA's `cublasXt`, this library outperforms by more than 60\% in some cases, as can be seen in the following plot:
-<p align="center"><img src="https://github.com/kabicm/Tiled-MM/blob/master/docs/performance.svg" width="80%"></p>
-The main improvement comes from the fact that Tiled-MM preallocates the device buffers in the moment of the context-creation and then keeps reusing it, whereas cublasXt seems to allocate and deallocate device buffers on the fly.
+The benchmarks were performed on a single node of Piz Daint Supercomputer (Cray XC50), equipped with `P100` GPU. We compared the performance of our library `Tiled-MM` with the vanilla version of `cublasXt` and also with the manually tuned version of `cublasXt`, where we manually set the tile size to `4000` and enabled the pinned memory mode. `Tiled-MM` was substantially faster than the vanilla version of `cublasXt`, and achieved similar performance as the manually tuned version of `cublasXt`, as can be seen from the results below.
+<p align="center"><img src="https://github.com/kabicm/Tiled-MM/blob/master/docs/performance.svg" width="90%"></p>
 
-In the benchmark, we used double precision, square matrices given in `column-major` ordering, and `alpha = beta = 1.0`.
+In the benchmark, we used `double precision`, `square matrices` given in `column-major` ordering, and `alpha = beta = 1.0`.
 
 ## Features:
 
@@ -45,11 +44,11 @@ make -j 4
 Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
 // A dimensions: MxK
-auto a_host = gpu::malloc_pinned<double>(M*K, 1);
+auto a_host = gpu::malloc_device<double>(M*K, 1);
 // B dimensions: KxN
-auto b_host = gpu::malloc_pinned<double>(K*N, 1);
+auto b_host = gpu::malloc_device<double>(K*N, 1);
 // C dimensions: MxN
-auto c_host = gpu::malloc_pinned<double>(M*N, 0);
+auto c_host = gpu::malloc_device<double>(M*N, 0);
 
 double alpha = 1.0;
 double beta = 1.0;
@@ -62,7 +61,7 @@ auto ctx = gpu::make_context();
 // compute c = alpha * a * b + beta * c
 // There is also a version without ctx, in case the user
 // does not want to create the context explicitly
-gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta); // optional
 ```
 When creating the context, the user can specify tile dimensions and the number of streams to be used as:
 ```cpp

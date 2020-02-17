@@ -4,7 +4,7 @@ This is a library for multiplying matrices on GPU. As opposed to NVIDIA's `cubla
 
 ## Performance
 
-The benchmarks were performed on a single node of Piz Daint Supercomputer (Cray XC50), equipped with `P100` GPU. We compared the performance of our library `Tiled-MM` with the vanilla version of `cublasXt` and also with the manually tuned version of `cublasXt`, where we manually set the tile size to `4000` and enabled the pinned memory mode. `Tiled-MM` was substantially faster than the vanilla version of `cublasXt`, and achieved similar performance as the manually tuned version of `cublasXt`, as can be seen from the results below.
+The benchmarks were performed on a single node of Piz Daint Supercomputer (Cray XC50), equipped with a `P100` NVIDIA GPU. We compared the performance of our library `Tiled-MM` with the vanilla version of `cublasXt` and also with the manually tuned version of `cublasXt`, where we manually set the tile size to `4000` and enabled the pinned memory mode. `Tiled-MM` was substantially faster than the vanilla version of `cublasXt`, and achieved similar performance as the manually tuned version of `cublasXt`, as can be seen from the results below.
 <p align="center"><img src="https://github.com/kabicm/Tiled-MM/blob/master/docs/performance.svg" width="90%"></p>
 
 In the benchmark, we used `double precision`, `square matrices` given in `column-major` ordering, and `alpha = beta = 1.0`.
@@ -33,11 +33,15 @@ mkdir build
 cd build
 
 # build
-CC=gcc-8 CXX=g++-8 cmake -DCMAKE_BUILD_TYPE=Release ..
+CC=gcc-8 CXX=g++-8 cmake -DTILEDMM_GPU_BACKEND=CUDA ..
 
 # compile
 make -j 4
 ```
+
+The option `-DTILEDMM_GPU_BACKEND` can have the following values:
+- `CUDA`: for NVIDIA GPUs
+- `ROCM`: for AMD GPUs
 
 ## Example
 

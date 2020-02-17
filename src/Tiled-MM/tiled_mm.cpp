@@ -295,7 +295,31 @@ void gpu_dgemm_(mm_handle& m_handle, double* a, double* b, double* c,
 template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         int m, int n, int k,
-        Scalar alpha, Scalar beta) {
+        Scalar alpha, Scalar beta, bool pin_host_buffers) {
+    if (pin_host_buffers) {
+        // pin matrix A
+        // auto start = std::chrono::steady_clock::now();
+        auto status = gpu::runtime_api::host_register(
+                a,
+                m * k * sizeof(Scalar),
+                gpu::runtime_api::flag::HostRegisterDefault);
+        gpu::check_runtime_status(status);
+        // pin matrix B
+        status = gpu::runtime_api::host_register(
+                b,
+                k * n * sizeof(Scalar),
+                gpu::runtime_api::flag::HostRegisterDefault);
+        gpu::check_runtime_status(status);
+        // pin matrix C
+        status = gpu::runtime_api::host_register(
+                c,
+                m * n * sizeof(Scalar),
+                gpu::runtime_api::flag::HostRegisterDefault);
+        gpu::check_runtime_status(status);
+        // auto end = std::chrono::steady_clock::now();
+        // auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        // std::cout << "Pinning time = " << time << std::endl;
+    }
     int tile_size_m, tile_size_n, tile_size_k;
     std::tie(tile_size_m, tile_size_n, tile_size_k) = handle.get_tile_sizes();
 
@@ -314,24 +338,41 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
     auto status =
     runtime_api::device_synchronize();
     check_runtime_status(status);
+
+    if (pin_host_buffers) {
+        // start = std::chrono::steady_clock::now();
+        // unpin matrix A
+        status = gpu::runtime_api::host_unregister(a);
+        gpu::check_runtime_status(status);
+        // unpin matrix B
+        status = gpu::runtime_api::host_unregister(b);
+        gpu::check_runtime_status(status);
+        // unpin matrix C
+        status = gpu::runtime_api::host_unregister(c);
+        gpu::check_runtime_status(status);
+
+        // end = std::chrono::steady_clock::now();
+        // time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        // std::cout << "Unpinning time = " << time << std::endl;
+    }
 }
 
 
 
 template void gemm<float>(mm_handle<float>& handle, float* a, float* b, float* c,
         int m, int n, int k,
-        float alpha, float beta);
+        float alpha, float beta, bool pin_host_buffers);
 
 template void gemm<double>(mm_handle<double>& handle, double* a, double* b, double* c,
         int m, int n, int k,
-        double alpha, double beta);
+        double alpha, double beta, bool pin_host_buffers);
 
 template void gemm<zfloat>(mm_handle<zfloat>& handle, zfloat* a, zfloat* b, zfloat* c,
         int m, int n, int k,
-        zfloat alpha, zfloat beta);
+        zfloat alpha, zfloat beta, bool pin_host_buffers);
 
 template void gemm<zdouble>(mm_handle<zdouble>& handle, zdouble* a, zdouble* b, zdouble* c,
         int m, int n, int k,
-        zdouble alpha, zdouble beta);
+        zdouble alpha, zdouble beta, bool pin_host_buffers);
 
 }

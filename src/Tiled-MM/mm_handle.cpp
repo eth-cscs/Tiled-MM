@@ -92,9 +92,40 @@ void mm_handle<Scalar>::set_tile_sizes(int tile_size) {
     set_tile_sizes(tile_size, tile_size, tile_size);
 }
 
+// tries to find a possibly smaller tile size that 
+// perfectly divides the dimension.
+// If the found tile size is too small, then 
+// stick to the max_tile_size.
+// The divisibility is not a requirement of the algorithm
+// but can improve the performance.
+int divisible_tile_size(int dim, int max_tile_size) {
+    int tile = 1;
+    int limit = std::min(max_tile_size, dim)
+    // iterate over divisors of dim
+    for (int i = 1; i <= limit; ++i) {
+        if (dim % i == 0) {
+            tile = i;
+        }
+    }
+
+    // if the divisible tile size is not smaller than half of the 
+    // max_tile_size then use it, otherwise, stick to the max_tile_size
+    if (std::abs(max_tile_size - tile) <= max_tile_size/2) 
+        return tile;
+    return limit;
+}
+
 template <typename Scalar>
-std::tuple<int, int, int> mm_handle<Scalar>::get_tile_sizes() {
+std::tuple<int, int, int> mm_handle<Scalar>::get_max_tile_sizes() {
     return {tile_size_m, tile_size_n, tile_size_k};
+}
+
+template <typename Scalar>
+std::tuple<int, int, int> mm_handle<Scalar>::get_tile_sizes(int m, int n, int k) {
+    int tile_m = divisible_tile_size(m, tile_size_m);
+    int tile_n = divisible_tile_size(n, tile_size_n);
+    int tile_k = divisible_tile_size(k, tile_size_k);
+    return {tile_m, tile_n, tile_k};
 }
 
 template <typename Scalar>

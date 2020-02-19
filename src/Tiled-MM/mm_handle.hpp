@@ -26,7 +26,11 @@ public:
 
     void set_tile_sizes(int tile_size_m, int tile_size_n, int tile_size_k);
     void set_tile_sizes(int tile_size);
-    std::tuple<int, int, int> get_tile_sizes();
+    // returns the tile sizes that are actually used for 
+    // given problem size: m, n, k
+    std::tuple<int, int, int> get_tile_sizes(int m, int n, int k);
+    // returns the allocated tile sizes
+    std::tuple<int, int, int> get_max_tile_sizes();
 
     void set_streams_and_tiles(int streams, int tile_size_m, int tile_size_n, int tile_size_k);
 
@@ -36,9 +40,9 @@ public:
 
 private:
     int n_streams = 2;
-    int tile_size_m = 4096;
-    int tile_size_n = 4096;
-    int tile_size_k = 4096;
+    int tile_size_m = 5000;
+    int tile_size_n = 5000;
+    int tile_size_k = 5000;
 
     gpu_context ctx;
 

@@ -100,7 +100,7 @@ void mm_handle<Scalar>::set_tile_sizes(int tile_size) {
 // but can improve the performance.
 int divisible_tile_size(int dim, int max_tile_size) {
     int tile = 1;
-    int limit = std::min(max_tile_size, dim)
+    int limit = std::min(max_tile_size, dim);
     // iterate over divisors of dim
     for (int i = 1; i <= limit; ++i) {
         if (dim % i == 0) {

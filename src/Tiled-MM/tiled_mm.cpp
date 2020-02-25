@@ -180,7 +180,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
     auto& result_stream = gpu_ctx.get_result_stream();
 
     std::vector<device_event> c_computed_on_device(n_streams);
-    std::vector<device_event> c_copied_to_device(n_streams);
+    std::vector<device_event> c_copied_to_host(n_streams);
 
     for (int i = 0; i < n_tiles_m * n_tiles_n; i += n_streams) {
         for (int k_tile_id = 0; k_tile_id < n_tiles_k; ++k_tile_id) {
@@ -198,7 +198,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         get_tile_sizes(a_host, b_host, c_host,
                                 m_tile_id, n_tile_id, k_tile_id);
 
-                    Scalar new_beta = k_tile_id == 0 ? beta : 1.0;
+                    Scalar new_beta = k_tile_id == 0 ? beta : Scalar{1};
 
                     auto& current_stream = gpu_ctx.get_device_stream(stream_id);
 
@@ -215,7 +215,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
 
                         // copy C tile if this is the first partial result and beta > 0
                         if (k_tile_id == 0 && std::abs(beta) > 0) {
-                            current_stream.wait_on_event(c_copied_to_device[stream_id]);
+                            current_stream.wait_on_event(c_copied_to_host[stream_id]);
                             copy_tile_to_device_async(c_host, c_device,
                                     {m_tile_id, n_tile_id},
                                     gpu_ctx, stream_id);
@@ -224,8 +224,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         // perform dgemm
                         // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
-                        auto& gemm_stream = gpu_ctx.get_device_stream(stream_id);
-                        gemm_stream.wait_on_event(c_copied_to_device[stream_id]);
+                        current_stream.wait_on_event(c_copied_to_host[stream_id]);
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
                                 actual_size_m, actual_size_n, actual_size_k,
@@ -236,7 +235,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                                 c_device.stream_buffer(stream_id));
                         check_blas_status(status);
 
-                        c_computed_on_device[stream_id] = gemm_stream.enqueue_event();
+                        c_computed_on_device[stream_id] = current_stream.enqueue_event();
 
                         if (k_tile_id == n_tiles_k - 1) {
                             // copy result back to host
@@ -244,7 +243,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                             copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
                                     {m_tile_id, n_tile_id},
                                     result_stream);
-                            c_copied_to_device[stream_id] = gemm_stream.enqueue_event();
+                            c_copied_to_host[stream_id] = current_stream.enqueue_event();
                         }
                     }
                     current_i++;

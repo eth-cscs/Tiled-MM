@@ -319,6 +319,7 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         // auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
         // std::cout << "Pinning time = " << time << std::endl;
     }
+
     int tile_size_m, tile_size_n, tile_size_k;
     std::tie(tile_size_m, tile_size_n, tile_size_k) = handle.get_tile_sizes(m, n, k);
 

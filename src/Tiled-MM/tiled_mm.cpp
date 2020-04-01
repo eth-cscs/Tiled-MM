@@ -224,7 +224,10 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         // perform dgemm
                         // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
-                        current_stream.wait_on_event(c_copied_to_host[stream_id]);
+                        if (k_tile_id == 0) {
+                            current_stream.wait_on_event(c_copied_to_host[stream_id]);
+                        }
+
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
                                 actual_size_m, actual_size_n, actual_size_k,
@@ -235,15 +238,14 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                                 c_device.stream_buffer(stream_id));
                         check_blas_status(status);
 
-                        c_computed_on_device[stream_id] = current_stream.enqueue_event();
-
                         if (k_tile_id == n_tiles_k - 1) {
+                            c_computed_on_device[stream_id] = current_stream.enqueue_event();
                             // copy result back to host
                             result_stream.wait_on_event(c_computed_on_device[stream_id]);
                             copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
                                     {m_tile_id, n_tile_id},
                                     result_stream);
-                            c_copied_to_host[stream_id] = current_stream.enqueue_event();
+                            c_copied_to_host[stream_id] = result_stream.enqueue_event();
                         }
                     }
                     current_i++;

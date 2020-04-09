@@ -323,12 +323,17 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
     }
 
     int tile_size_m, tile_size_n, tile_size_k;
-    std::tie(tile_size_m, tile_size_n, tile_size_k) = handle.get_tile_sizes(m, n, k);
+    std::tie(tile_size_m, tile_size_n, tile_size_k) = handle.optimal_tile_sizes(m, n, k);
 
+    // set these tile sizes to GPU matrices
+    handle.set_tile_sizes(tile_size_m, tile_size_n, tile_size_k);
+
+    // set these tile sizes to CPU matrices
     tiled_matrix<Scalar> a_host(a, m, k, {tile_size_m, tile_size_k});
     tiled_matrix<Scalar> b_host(b, k, n, {tile_size_k, tile_size_n});
     tiled_matrix<Scalar> c_host(c, m, n, {tile_size_m, tile_size_n});
 
+    // get GPU matrices
     device_buffer<Scalar>& a_device = handle.get_device_buffer_a();
     device_buffer<Scalar>& b_device = handle.get_device_buffer_b();
     device_buffer<Scalar>& c_device = handle.get_device_buffer_c();

@@ -1,7 +1,9 @@
 #pragma once
-#include "device_vector.hpp"
-#include "tile_dim.hpp"
-#include "util.hpp"
+#include <vector>
+#include <cassert>
+#include <Tiled-MM/device_vector.hpp>
+#include <Tiled-MM/tile_dim.hpp>
+#include <Tiled-MM/util.hpp>
 
 namespace gpu {
 
@@ -12,7 +14,7 @@ template<typename T>
 class device_buffer {
 public:
     device_buffer() = default;
-    device_buffer(int streams, tile_dim tile);
+    device_buffer(int streams);
 
     T* stream_buffer(int stream_id);
 
@@ -20,13 +22,14 @@ public:
 
     void set_num_streams(int streams);
 
-    void set_tile_dimensions(tile_dim tile);
-    tile_dim tile_dimensions();
+    void set_tile_sizes(tile_dim tile);
+    tile_dim get_tile_sizes();
 
     void set_streams_and_tiles(int streams, tile_dim tile);
 
 private:
     int n_streams;
+    // initial tile size
     tile_dim tile_;
     device_vector<T> d_vec;
 };
@@ -35,11 +38,8 @@ private:
 // class implementation
 // ****************************************************************** 
 template<typename T>
-device_buffer<T>::device_buffer(int streams, tile_dim tile): 
-        n_streams(streams), tile_(tile) {
-    // std::cout << "creating device buffer of size = " << streams  << " * " << tile_.size() << std::endl;
-    d_vec = device_vector<T>(streams * tile.size());
-}
+device_buffer<T>::device_buffer(int streams): 
+        n_streams(streams) {}
 
 template<typename T>
 T* device_buffer<T>::stream_buffer(int stream_id) {
@@ -48,6 +48,8 @@ T* device_buffer<T>::stream_buffer(int stream_id) {
     }
     int tile_size = tile_.size();
     int offset = stream_id * tile_size;
+    assert(tile_size > 0);
+    assert(d_vec.size() >= offset);
     return d_vec.data() + offset;
 }
 
@@ -63,13 +65,13 @@ void device_buffer<T>::set_num_streams(int streams) {
 }
 
 template<typename T>
-void device_buffer<T>::set_tile_dimensions(tile_dim tile) {
+void device_buffer<T>::set_tile_sizes(tile_dim tile) {
     tile_ = tile;
     d_vec.resize(n_streams * tile_.size());
 }
 
 template<typename T>
-tile_dim device_buffer<T>::tile_dimensions() {
+tile_dim device_buffer<T>::get_tile_sizes() {
     return tile_;
 }
 

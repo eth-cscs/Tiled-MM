@@ -11,8 +11,8 @@ namespace gpu{
 template <typename Scalar>
 class mm_handle {
 public:
-    mm_handle(int ranks_per_gpu, double allowance_ratio);
-    mm_handle(int streams, int tile_m, int tile_n, int tile_k);
+    // the constructor just reserves the device vectors, without resizing
+    mm_handle(int streams, int max_tile_m, int max_tile_n, int max_tile_k);
     ~mm_handle();
 
     mm_handle(mm_handle&&) = delete;
@@ -24,11 +24,12 @@ public:
 
     gpu_context& get_gpu_context();
 
+    // these resize the device vectors
     void set_tile_sizes(int tile_size_m, int tile_size_n, int tile_size_k);
     void set_tile_sizes(int tile_size);
     // returns the tile sizes that are actually used for 
     // given problem size: m, n, k
-    std::tuple<int, int, int> get_tile_sizes(int m, int n, int k);
+    std::tuple<int, int, int> optimal_tile_sizes(int m, int n, int k);
     // returns the allocated tile sizes
     std::tuple<int, int, int> get_max_tile_sizes();
 
@@ -40,11 +41,13 @@ public:
 
 private:
     int n_streams = 2;
-    int tile_size_m = 5000;
-    int tile_size_n = 5000;
-    int tile_size_k = 5000;
+    int max_tile_size_m = 5000;
+    int max_tile_size_n = 5000;
+    int max_tile_size_k = 5000;
 
     gpu_context ctx;
+
+    // device_vector<Scalar> memory_pool;
 
     device_buffer<Scalar> a_buff;
     device_buffer<Scalar> b_buff;
@@ -52,13 +55,20 @@ private:
 };
 
 template <typename Scalar>
-std::unique_ptr<mm_handle<Scalar>> make_context(int ranks_per_gpu = 1, double allowance_ratio = 0.9) {
-    return std::make_unique<mm_handle<Scalar>>(ranks_per_gpu, allowance_ratio);
+std::unique_ptr<mm_handle<Scalar>> make_context(int streams, 
+                                                int max_tile_m, 
+                                                int max_tile_n, 
+                                                int max_tile_k) {
+    return std::make_unique<mm_handle<Scalar>>(streams, 
+                                               max_tile_m, 
+                                               max_tile_n, 
+                                               max_tile_k);
 }
-
 template <typename Scalar>
-std::unique_ptr<mm_handle<Scalar>> make_context(int streams, int tile_m, int tile_n, int tile_k) {
-    return std::make_unique<mm_handle<Scalar>>(streams, tile_m, tile_n, tile_k);
+std::unique_ptr<mm_handle<Scalar>> make_context() {
+    return std::make_unique<mm_handle<Scalar>>(2, 
+                                               5000, 
+                                               5000, 
+                                               5000);
 }
-
 }

@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include "util.hpp"
 #include "gpu_runtime_api.hpp"
 
@@ -24,14 +25,16 @@ public:
 
     T* data();
     std::size_t size();
+    std::size_t capacity();
 
-    void resize(int size);
+    void resize(std::size_t size);
 
     ~device_vector();
 
 private:
-    T* data_ = nullptr;
-    std::size_t size_ = 0lu;
+    T* data_;
+    std::size_t size_ = (std::size_t) 0;
+    std::size_t capacity_ = (std::size_t) 0;
 };
 
 // ****************************************************************** 
@@ -39,20 +42,24 @@ private:
 // ****************************************************************** 
 template <typename T>
 device_vector<T>::device_vector(std::size_t n): 
-    data_(malloc_device<T>(n)),
-    size_(n) {}
+    size_(n),
+    capacity_((std::size_t) std::ceil(1.2 * n)) {
+    data_ = malloc_device<T>(capacity_);
+}
 
 // assignment operators are supported
 template <typename T>
 device_vector<T>& device_vector<T>::operator=(device_vector<T>&& other) {
     if (this != &other) {
-        if (this->data_) {
+        if (this->capacity() > 0) {
             auto status = runtime_api::free(this->data_);
             check_runtime_status(status);
         }
         this->data_ = other.data_;
-        other.data_ = nullptr;
         this->size_ = other.size_;
+        this->capacity_ = other.capacity_;
+        other.size_ = 0;
+        other.capacity_ = 0;
     }
     return *this;
 }
@@ -68,16 +75,34 @@ std::size_t device_vector<T>::size() {
 }
 
 template <typename T>
+std::size_t device_vector<T>::capacity() {
+    return capacity_;
+}
+
+template <typename T>
 device_vector<T>::~device_vector() {
-    if (data_) {
-        runtime_api::free(data_);
+    if (capacity() > 0) {
+        auto status = runtime_api::free(data_);
+        check_runtime_status(status);
+        capacity_ = 0;
+        size_ = 0;
     }
 }
 
 template <typename T>
-void device_vector<T>::resize(int size) {
-    this->~device_vector();
-    *this = device_vector(size);
+void device_vector<T>::resize(std::size_t size) {
+    if (size > 0) {
+        if (size > capacity()) {
+            if (capacity() > 0) {
+                auto status = runtime_api::free(data_);
+                check_runtime_status(status);
+            }
+            size_ = size;
+            capacity_ = (std::size_t) std::ceil(1.2 * size);
+            data_ = malloc_device<T>(capacity_);
+        } else {
+            size_ = size;
+        }
+    }
 }
-
 }

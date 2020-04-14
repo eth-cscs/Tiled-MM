@@ -1,9 +1,9 @@
-add_library(Tiled-MM STATIC gpu_context.cpp
-                            mm_handle.cpp
-                            tile_dim.cpp
-                            tiled_matrix.cpp
-                            tiled_mm.cpp
-                            tile_coord.cpp)
+add_library(Tiled-MM gpu_context.cpp
+                     mm_handle.cpp
+                     tile_dim.cpp
+                     tiled_matrix.cpp
+                     tiled_mm.cpp
+                     tile_coord.cpp)
 
 target_link_libraries(Tiled-MM PUBLIC ${TILEDMM_EXTERNAL_LIBRARIES})
 

@@ -14,7 +14,14 @@ mm_handle<Scalar>::mm_handle(int streams, int max_tile_m, int max_tile_n, int ma
         max_tile_size_n(max_tile_n),
         max_tile_size_k(max_tile_k),
         ctx(streams) {
-    runtime_api::set_device(0);
+
+    // here we don't set the device because:
+    //     - if the user has already set it, 
+    //       we don't want to oevrwrite it
+    //     - if the user didn't set it,
+    //       it's anyway 0 by default
+    // runtime_api::set_device(0);
+    // status = runtime_api::get_device(&old_device);
 
     a_buff = device_buffer<Scalar>(n_streams);
     b_buff = device_buffer<Scalar>(n_streams);

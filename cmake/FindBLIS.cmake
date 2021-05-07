@@ -26,69 +26,61 @@
 
 
 #.rst:
-# FindHIP
+# FindBLIS
 # -----------
 #
-# This module searches for the fftw3 library.
+# This module tries to find the BLIS library.
 #
 # The following variables are set
 #
 # ::
 #
-#   HIP_FOUND           - True if hip is found
-#   HIP_LIBRARIES       - The required libraries
-#   HIP_INCLUDE_DIRS    - The required include directory
-#   HIP_DEFINITIONS     - The required definitions
+#   BLIS_FOUND           - True if blis is found
+#   BLIS_LIBRARIES       - The required libraries
+#   BLIS_INCLUDE_DIRS    - The required include directory
 #
 # The following import target is created
 #
 # ::
 #
-#   HIP::hip
+#   BLIS::blis
 
-
-
-# set paths to look for library
-set(_HIP_PATHS ${HIP_ROOT} $ENV{HIP_ROOT})
-set(_HIP_INCLUDE_PATHS)
-
-set(_HIP_DEFAULT_PATH_SWITCH)
-
-if(_HIP_PATHS)
-    # disable default paths if ROOT is set
-    set(_HIP_DEFAULT_PATH_SWITCH NO_DEFAULT_PATH)
-else()
-    set(_HIP_PATHS /opt/rocm)
+#set paths to look for library from ROOT variables.If new policy is set, find_library() automatically uses them.
+if(NOT POLICY CMP0074)
+    set(_BLIS_PATHS ${BLIS_ROOT} $ENV{BLIS_ROOT})
 endif()
 
-
-find_path(HIP_INCLUDE_DIRS
-    NAMES "hip/hip_runtime_api.h"
-    HINTS ${_HIP_PATHS} ${_HIP_INCLUDE_PATHS}
-    PATH_SUFFIXES "include" "hip/include"
-    ${_HIP_DEFAULT_PATH_SWITCH}
-)
 find_library(
-    HIP_LIBRARIES
-    NAMES "hip_hcc"
-    HINTS ${_HIP_PATHS}
-    PATH_SUFFIXES "hip" "hip/lib" "lib"
-    ${_HIP_DEFAULT_PATH_SWITCH}
+    BLIS_LIBRARIES
+    NAMES "blis"
+    HINTS ${_BLIS_PATHS}
+    PATH_SUFFIXES "blis/lib" "blis/lib64" "blis"
+)
+find_path(
+    BLIS_INCLUDE_DIRS
+    NAMES "blis.h"
+    HINTS ${_BLIS_PATHS}
+    PATH_SUFFIXES "blis" "blis/include" "include/blis"
+)
+find_path(
+    BLIS_CBLAS_INCLUDE_DIRS
+    NAMES "cblas_blis.h" "cblas-blis.h" "cblas.h"
+    HINTS ${_BLIS_PATHS}
+    PATH_SUFFIXES "blis" "blis/include" "include/blis"
 )
 
 # check if found
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(HIP REQUIRED_VARS HIP_INCLUDE_DIRS HIP_LIBRARIES )
+find_package_handle_standard_args(BLIS REQUIRED_VARS BLIS_INCLUDE_DIRS BLIS_LIBRARIES BLIS_CBLAS_INCLUDE_DIRS)
 
 # add target to link against
-if(HIP_FOUND)
-    if(NOT TARGET HIP::hip)
-        add_library(HIP::hip INTERFACE IMPORTED)
+if(BLIS_FOUND)
+    if(NOT TARGET BLIS::blis)
+        add_library(BLIS::blis INTERFACE IMPORTED)
     endif()
-    set_property(TARGET HIP::hip PROPERTY INTERFACE_LINK_LIBRARIES ${HIP_LIBRARIES})
-    set_property(TARGET HIP::hip PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${HIP_INCLUDE_DIRS})
-    set_property(TARGET HIP::hip PROPERTY INTERFACE_COMPILE_DEFINITIONS __HIP_PLATFORM_HCC__)
+    set_property(TARGET BLIS::blis PROPERTY INTERFACE_LINK_LIBRARIES ${BLIS_LIBRARIES})
+    set_property(TARGET BLIS::blis PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${BLIS_INCLUDE_DIRS} ${BLIS_CBLAS_INCLUDE_DIRS})
 endif()
 
 # prevent clutter in cache
-MARK_AS_ADVANCED(HIP_FOUND HIP_LIBRARIES HIP_INCLUDE_DIRS)
+MARK_AS_ADVANCED(BLIS_FOUND BLIS_LIBRARIES BLIS_INCLUDE_DIRS BLIS_CBLAS_INCLUDE_DIRS)

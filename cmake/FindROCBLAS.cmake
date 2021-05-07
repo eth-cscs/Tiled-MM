@@ -29,7 +29,7 @@
 # FindROCBLAS
 # -----------
 #
-# This module searches for the fftw3 library.
+# This module tries to find the rocBLAS library.
 #
 # The following variables are set
 #
@@ -49,34 +49,26 @@
 #
 #   ROCBLAS::rocblas
 
-
-
-# set paths to look for library
-set(_ROCBLAS_PATHS ${ROCBLAS_ROOT} $ENV{ROCBLAS_ROOT})
-set(_ROCBLAS_INCLUDE_PATHS)
-
-set(_ROCBLAS_DEFAULT_PATH_SWITCH)
-
-if(_ROCBLAS_PATHS)
-    # disable default paths if ROOT is set
-    set(_ROCBLAS_DEFAULT_PATH_SWITCH NO_DEFAULT_PATH)
-else()
-    set(_ROCBLAS_PATHS /opt/rocm)
+#set paths to look for library from ROOT variables.If new policy is set, find_library() automatically uses them.
+if(NOT POLICY CMP0074)
+    set(_ROCBLAS_PATHS ${ROCBLAS_ROOT} $ENV{ROCBLAS_ROOT})
 endif()
 
+if(NOT _ROCBLAS_PATHS)
+    set(_ROCBLAS_PATHS /opt/rocm)
+endif()
 
 find_library(
     ROCBLAS_LIBRARIES
     NAMES "rocblas"
     HINTS ${_ROCBLAS_PATHS}
-    PATH_SUFFIXES "rocblas" "rocblas/lib"
-    ${_ROCBLAS_DEFAULT_PATH_SWITCH}
+    PATH_SUFFIXES "rocblas/lib" "rocblas/lib64" "rocblas"
 )
-find_path(ROCBLAS_INCLUDE_DIRS
+find_path(
+    ROCBLAS_INCLUDE_DIRS
     NAMES "rocblas.h"
-    HINTS ${_ROCBLAS_PATHS} ${_ROCBLAS_INCLUDE_PATHS}
-    PATH_SUFFIXES "include" "rocblas/include"
-    ${_ROCBLAS_DEFAULT_PATH_SWITCH}
+    HINTS ${_ROCBLAS_PATHS}
+    PATH_SUFFIXES "rocblas/include" "include"
 )
 
 # check if found

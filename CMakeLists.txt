@@ -35,6 +35,7 @@ elseif(TILEDMM_GPU_BACKEND STREQUAL "ROCM")
     find_package(HIPLIBS REQUIRED)
     list(APPEND TILEDMM_EXTERNAL_LIBRARIES ROCBLAS::rocblas HIPLIBS::hiplibs)
     list(APPEND TILEDMM_DEFINITIONS -D__HIP_PLATFORM_HCC__) # since we are not using the hcc compiler, we have to set up this explicitly
+    list(APPEND TILEDMM_DEFINITIONS TILED_MM_ROCM)
     if(ROCBLAS_HAS_SGEMM)
         list(APPEND TILEDMM_DEFINITIONS TILED_MM_ROCBLAS_HAS_SGEMM)
     endif()

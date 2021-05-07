@@ -51,7 +51,7 @@ if(NOT POLICY CMP0074)
 endif()
 
 if(NOT _HIPLIBS_PATHS)
-    set(_HIPLIBS_PATHS /opt/rocm $ENV{ROCM_PATH})
+    set(_HIPLIBS_PATHS /opt/rocm $ENV{ROCM_PATH} $ENV{ROCM_HOME})
 endif()
 
 find_path(

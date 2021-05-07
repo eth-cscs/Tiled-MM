@@ -11,8 +11,10 @@ project(Tiled-MM VERSION 0.1 LANGUAGES CXX)
 option(TILEDMM_WITH_TESTS "Enable tests." ${MASTER_PROJECT})
 option(TILEDMM_WITH_EXAMPLES "Enable examples." ${MASTER_PROJECT})
 option(TILEDMM_WITH_INSTALL "Enable installation." ${MASTER_PROJECT})
-set(TILEDMM_GPU_BACKEND "CUDA" CACHE STRING "GPU backend")
 set_property(CACHE TILEDMM_GPU_BACKEND PROPERTY STRINGS "CUDA" "ROCM")
+if (NOT TILEDMM_GPU_BACKEND) 
+    set(TILEDMM_GPU_BACKEND "CUDA" CACHE STRING "GPU backend")
+endif()
 option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 
 

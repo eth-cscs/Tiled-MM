@@ -55,7 +55,7 @@ if(NOT POLICY CMP0074)
 endif()
 
 if(NOT _ROCBLAS_PATHS)
-    set(_ROCBLAS_PATHS /opt/rocm)
+    set(_ROCBLAS_PATHS /opt/rocm $ENV{ROCM_PATH})
 endif()
 
 find_library(

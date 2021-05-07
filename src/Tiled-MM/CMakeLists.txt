@@ -5,7 +5,7 @@ add_library(Tiled-MM gpu_context.cpp
                      tiled_mm.cpp
                      tile_coord.cpp)
 
-target_link_libraries(Tiled-MM PUBLIC ${TILEDMM_EXTERNAL_LIBRARIES} m)
+target_link_libraries(Tiled-MM PUBLIC ${TILEDMM_EXTERNAL_LIBRARIES})
 
 target_include_directories(Tiled-MM PUBLIC 
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>

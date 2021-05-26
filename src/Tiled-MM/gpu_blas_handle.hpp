@@ -9,7 +9,7 @@ namespace gpu {
 class gpu_blas_handle {
 public:
     gpu_blas_handle() {
-        runtime_api::set_device(0);
+        // runtime_api::set_device(0);
         auto status = 
         blas_api::create(&handle_);
         check_blas_status(status);

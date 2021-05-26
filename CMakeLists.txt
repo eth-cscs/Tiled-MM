@@ -17,21 +17,28 @@ endif()
 set_property(CACHE TILEDMM_GPU_BACKEND PROPERTY STRINGS "CUDA" "ROCM")
 option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 
-
 if(MASTER_PROJECT AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING
     "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release." FORCE)
 endif()
 
+message(STATUS "Selected TILEDMM_GPU_BACKEND: ${TILEDMM_GPU_BACKEND}")
 
 set (TILEDMM_DEFINITIONS)
 set (TILEDMM_EXTERNAL_LIBRARIES)
 # Dependencies
 #
 if(TILEDMM_GPU_BACKEND STREQUAL "CUDA")
-    find_package(CUBLAS REQUIRED)
-    list(APPEND TILEDMM_EXTERNAL_LIBRARIES CUDA::cublas)
+    find_package(CUDA REQUIRED)
+    if (NOT TARGET CUDA::cudalibs) 
+        add_library(CUDA::cudalibs INTERFACE IMPORTED)
+        set_target_properties(CUDA::cudalibs PROPERTIES
+                                         INTERFACE_INCLUDE_DIRECTORIES "${CUDA_INCLUDE_DIRS}"
+                                         INTERFACE_LINK_LIBRARIES "${CUDA_LIBRARIES};${CUDA_CUBLAS_LIBRARIES}")
+    endif()
+    list(APPEND TILEDMM_EXTERNAL_LIBRARIES CUDA::cudalibs)
     list(APPEND TILEDMM_DEFINITIONS TILED_MM_CUDA)
+
 elseif(TILEDMM_GPU_BACKEND STREQUAL "ROCM")
     find_package(HIPLIBS REQUIRED)
     find_package(ROCBLAS REQUIRED)

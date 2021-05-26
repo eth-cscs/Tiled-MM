@@ -50,9 +50,9 @@
 #   ROCBLAS::rocblas
 
 #set paths to look for library from ROOT variables.If new policy is set, find_library() automatically uses them.
-if(NOT POLICY CMP0074)
-    set(_ROCBLAS_PATHS ${ROCBLAS_ROOT} $ENV{ROCBLAS_ROOT})
-endif()
+#if(NOT POLICY CMP0074)
+set(_ROCBLAS_PATHS ${ROCBLAS_ROOT} $ENV{ROCBLAS_ROOT})
+#endif()
 
 if(NOT _ROCBLAS_PATHS)
     set(_ROCBLAS_PATHS /opt/rocm $ENV{ROCM_PATH} $ENV{ROCM_HOME})

@@ -46,9 +46,9 @@
 #   HIPLIBS::hiplibs
 
 #set paths to look for library from ROOT variables.If new policy is set, find_library() automatically uses them.
-if(NOT POLICY CMP0074)
-    set(_HIPLIBS_PATHS ${HIPLIBS_ROOT} $ENV{HIPLIBS_ROOT})
-endif()
+#if(NOT POLICY CMP0074)
+set(_HIPLIBS_PATHS ${HIPLIBS_ROOT} $ENV{HIPLIBS_ROOT})
+#endif()
 
 if(NOT _HIPLIBS_PATHS)
     set(_HIPLIBS_PATHS /opt/rocm $ENV{ROCM_PATH} $ENV{ROCM_HOME})

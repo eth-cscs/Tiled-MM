@@ -88,7 +88,6 @@ if(TILEDMM_WITH_INSTALL)
 
     install(FILES "${Tiled-MM_BINARY_DIR}/Tiled-MMConfig.cmake"
                   "${Tiled-MM_BINARY_DIR}/Tiled-MMConfigVersion.cmake"
-                  "${Tiled-MM_SOURCE_DIR}/cmake/FindCUBLAS.cmake"
                   "${Tiled-MM_SOURCE_DIR}/cmake/FindROCBLAS.cmake"
                   "${Tiled-MM_SOURCE_DIR}/cmake/FindHIPLIBS.cmake"
             DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tiled-MM")

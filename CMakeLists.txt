@@ -30,6 +30,10 @@ set (TILEDMM_EXTERNAL_LIBRARIES)
 #
 if(TILEDMM_GPU_BACKEND STREQUAL "CUDA")
     find_package(CUDA REQUIRED)
+    # this seems to be a cmake bug that was fixed in 3.12.2
+    if(CUDA_VERSION VERSION_GREATER 9.1 AND CMAKE_VERSION VERSION_LESS 3.12.2)
+         list(REMOVE_ITEM CUDA_CUBLAS_LIBRARIES "CUDA_cublas_device_LIBRARY-NOTFOUND")
+    endif()
     if (NOT TARGET CUDA::cudalibs) 
         add_library(CUDA::cudalibs INTERFACE IMPORTED)
         set_target_properties(CUDA::cudalibs PROPERTIES

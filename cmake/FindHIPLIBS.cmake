@@ -51,7 +51,7 @@ set(_HIPLIBS_PATHS ${HIPLIBS_ROOT} $ENV{HIPLIBS_ROOT})
 #endif()
 
 if(NOT _HIPLIBS_PATHS)
-    set(_HIPLIBS_PATHS /opt/rocm $ENV{ROCM_PATH} $ENV{ROCM_HOME})
+    set(_HIPLIBS_PATHS $ENV{ROCM_PATH} $ENV{ROCM_HOME} /opt/rocm)
 endif()
 
 find_path(

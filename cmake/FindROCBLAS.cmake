@@ -55,7 +55,7 @@ set(_ROCBLAS_PATHS ${ROCBLAS_ROOT} $ENV{ROCBLAS_ROOT})
 #endif()
 
 if(NOT _ROCBLAS_PATHS)
-    set(_ROCBLAS_PATHS /opt/rocm $ENV{ROCM_PATH} $ENV{ROCM_HOME})
+    set(_ROCBLAS_PATHS $ENV{ROCM_PATH} $ENV{ROCM_HOME} /opt/rocm)
 endif()
 
 find_library(

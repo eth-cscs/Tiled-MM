@@ -5,7 +5,7 @@ This is a library for multiplying matrices on GPU. As opposed to NVIDIA's `cubla
 ## Performance
 
 The benchmarks were performed on a single node of Piz Daint Supercomputer (Cray XC50), equipped with a `P100` NVIDIA GPU. We compared the performance of our library `Tiled-MM` with the vanilla version of `cublasXt` and also with the manually tuned version of `cublasXt`, where we manually set the tile size to `4000` and enabled the pinned memory mode. `Tiled-MM` was substantially faster than the vanilla version of `cublasXt`, and achieved similar performance as the manually tuned version of `cublasXt`, as can be seen from the results below.
-<p align="center"><img src="https://github.com/kabicm/Tiled-MM/blob/master/docs/performance.svg" width="90%"></p>
+<p align="center"><img src="https://github.com/eth-cscs/Tiled-MM/blob/master/docs/performance.svg" width="90%"></p>
 
 In the benchmark, we used `double precision`, `square matrices` given in `column-major` ordering, and `alpha = beta = 1.0`.
 
@@ -27,7 +27,7 @@ These are just current limitations which are planned to be handled in some futur
 Assuming that you want to use the `gcc 8` compiler, you can build the project as follows:
 ```bash
 # clone the repo
-git clone --recursive https://github.com/kabicm/Tiled-MM
+git clone --recursive https://github.com/eth-cscs/Tiled-MM
 cd Tiled-MM
 mkdir build
 cd build

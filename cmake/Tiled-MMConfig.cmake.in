@@ -5,13 +5,13 @@ if(NOT TARGET Tiled-MM::Tiled-MM)
     set(TILEDMM_GPU_BACKEND "@TILEDMM_GPU_BACKEND@")
 
     if(TILEDMM_GPU_BACKEND STREQUAL "CUDA")
-        set(CUDA_PATH "@CUDA_PATH@")
-        find_dependency(CUBLAS)
+        find_package(CUDA REQUIRED)
+        find_package(CUBLAS REQUIRED)
     endif()
 
     if(TILEDMM_GPU_BACKEND STREQUAL "ROCM")
-        find_package(ROCBLAS)
-        find_package(HIP)
+        find_package(HIPLIBS REQUIRED)
+        find_package(ROCBLAS REQUIRED)
     endif()
 
     include("${CMAKE_CURRENT_LIST_DIR}/Tiled-MMTargets.cmake")

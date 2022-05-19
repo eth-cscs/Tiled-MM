@@ -48,11 +48,11 @@ The option `-DTILEDMM_GPU_BACKEND` can have the following values:
 Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
 // A dimensions: MxK
-auto a_host = gpu::malloc_device<double>(M*K, 1);
+auto a_host = gpu::malloc_pinned<double>(M*K, 1);
 // B dimensions: KxN
-auto b_host = gpu::malloc_device<double>(K*N, 1);
+auto b_host = gpu::malloc_pinned<double>(K*N, 1);
 // C dimensions: MxN
-auto c_host = gpu::malloc_device<double>(M*N, 0);
+auto c_host = gpu::malloc_pinned<double>(M*N, 0);
 
 double alpha = 1.0;
 double beta = 1.0;
@@ -65,7 +65,15 @@ auto ctx = gpu::make_context();
 // compute c = alpha * a * b + beta * c
 // There is also a version without ctx, in case the user
 // does not want to create the context explicitly
-gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta); // optional
+gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+
+// optionally, we can set the following two boolean flags
+bool pin_buffers = false; // since a_host, b_host and c_host are already pinned, gpu::dgemm should not pin them
+bool copy_c_back = true;  // if we want to copy the result back to the host or leave it on the gpu
+gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
+
+// if copy_c_back == false, the result is stored on the device with the following pointer:
+double* c_device = ctx->get_full_device_buffer_c().data()
 ```
 When creating the context, the user can specify tile dimensions and the number of streams to be used as:
 ```cpp

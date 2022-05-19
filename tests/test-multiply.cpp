@@ -92,7 +92,7 @@ int main(int argc, char** argv){
 
     auto ctx = gpu::make_context<double>();
     // compute c = alpha * a * b + beta * c
-    gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+    gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, false);
 
     bool correct = equal(c_host, c_host_reference, M*N);
 

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdio>
 #include <chrono>
+#include <random>
 
 #ifdef TILED_MM_CUDA
 #include <cublasXt.h>
@@ -59,13 +60,45 @@ using value_type = double;
 using size_type  = size_t;
 
 template <typename T>
+void fill_matrix(T* ptr, size_t size) {
+    static std::random_device dev;                        // seed
+    static std::mt19937 rng(dev());                       // generator
+    static std::uniform_real_distribution<T> dist(10.0); // distribution
+
+    for (unsigned i = 0; i < size; ++i) {
+        ptr[i] = T{dist(rng)};
+    }
+}
+
+template <typename T>
+void copy_matrix(T* from, T* to, std::size_t size) {
+    for (unsigned i = 0; i < size; ++i) {
+        to[i] = from[i];
+    }
+}
+
+template <typename T>
 bool equal(T* v1, T* v2, size_t len, double eps=1e-6) {
     for (unsigned i = 0; i < len; ++i) {
-        if (std::abs(*(v1 + i) - *(v2 + i)) > eps) {
+        auto value1 = *(v1 + i);
+        auto value2 = *(v2 + i);
+        if (std::abs(value1 - value2) > eps) {
             return false;
         }
     }
     return true;
+}
+
+template <typename T>
+void print_matrix(T* mat, int m, int n) {
+    for (unsigned i = 0; i < m; ++i) {
+        for (unsigned j = 0; j < n; ++j) {
+            auto el = j * m + i;
+            std::cout << mat[el] << "\t";
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "\n";
 }
 
 int main(int argc, char** argv){
@@ -75,6 +108,8 @@ int main(int argc, char** argv){
     auto N = options::next_long_long("-n", "--n_dim", "Number of columns of B and C.", 10000);
     auto K = options::next_long_long("-k", "--k_dim", "Number of columns of A and rows of B.", 10000);
 
+    bool small_sizes = std::max(M, std::max(N, K)) < 20;
+
     std::cout << "Multiplying: (M, N, K) = (" << M << ", " << N << ", " << K << ")\n";
 
     // A dimensions: MxK
@@ -83,18 +118,63 @@ int main(int argc, char** argv){
     auto b_host = gpu::malloc_pinned<value_type>(K*N, 1);
     // C dimensions: MxN
     auto c_host = gpu::malloc_pinned<value_type>(M*N, 0);
+    auto c_host2 = gpu::malloc_pinned<value_type>(M*N, 0);
     auto c_host_reference = gpu::malloc_pinned<value_type>(M*N, 0);
+
+    fill_matrix(a_host, M * K);
+    fill_matrix(b_host, K * N);
+    fill_matrix(c_host, M * N);
+
+    copy_matrix(c_host, c_host_reference, M * N);
+    copy_matrix(c_host, c_host2, M * N);
+
+    if (small_sizes) {
+        std::cout << "Initial values in matrix A: " << std::endl;
+        print_matrix(a_host, M, K);
+        std::cout << "Initial values in matrix B: " << std::endl;
+        print_matrix(b_host, K, N);
+        std::cout << "Initial values in matrix C: " << std::endl;
+        print_matrix(c_host, M, N);
+    }
 
     value_type alpha{1.};
     value_type beta{1.};
 
     compute_reference(a_host, b_host, c_host_reference, M, N, K, alpha, beta);
 
+    if (small_sizes) {
+        std::cout << "Correct result C = C + A*B: " << std::endl;
+        print_matrix(c_host_reference, M, N);
+    }
+
     auto ctx = gpu::make_context<double>();
+    // VERSION WITH COPYING C BACK
+    bool copy_c_back = true;
     // compute c = alpha * a * b + beta * c
-    gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, false);
+    gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, false, copy_c_back);
+
+    if (small_sizes) {
+        std::cout << "Computed result by Tiled-MM with copying C back : " << std::endl;
+        print_matrix(c_host, M, N);
+    }
 
     bool correct = equal(c_host, c_host_reference, M*N);
+
+    // VERSION WITHOUT COPYING C BACK
+    // compute the same but don't copy c back
+    gpu::gemm(*ctx, a_host, b_host, c_host2, M, N, K, alpha, beta, false, !copy_c_back);
+    auto status =
+    gpu::runtime_api::device_synchronize();
+    gpu::check_runtime_status(status);
+
+    gpu::copy_to_host(ctx->get_full_device_buffer_c().data(), c_host2, M * N);
+
+    if (small_sizes) {
+        std::cout << "Computed result by Tiled-MM without copying C back : " << std::endl;
+        print_matrix(c_host2, M, N);
+    }
+
+    correct = correct && equal(c_host2, c_host_reference, M*N);
 
     std::cout << "The result is " << (correct ? "CORRECT" : "NOT CORRECT") << std::endl;;
 

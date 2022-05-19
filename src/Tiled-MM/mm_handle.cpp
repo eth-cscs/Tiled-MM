@@ -70,6 +70,15 @@ void mm_handle<Scalar>::set_tile_sizes(int tile_size) {
     set_tile_sizes(tile_size, tile_size, tile_size);
 }
 
+template <typename Scalar>
+void mm_handle<Scalar>::set_full_sizes(int m, int n, int k) {
+    assert(m > 0);
+    assert(n > 0);
+    assert(k > 0);
+
+    full_c_buff.resize(m * n);
+}
+
 // tries to: either grow the current tile size if necessary and possible
 // or finds a possibly smaller tile size that 
 // perfectly divides the dimension.
@@ -148,6 +157,11 @@ device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_b() {
 template <typename Scalar>
 device_buffer<Scalar>& mm_handle<Scalar>::get_device_buffer_c() {
     return c_buff;
+}
+
+template <typename Scalar>
+device_vector<Scalar>& mm_handle<Scalar>::get_full_device_buffer_c() {
+    return full_c_buff;
 }
 
 template class mm_handle<float>;

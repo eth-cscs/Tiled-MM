@@ -27,6 +27,7 @@ public:
     // these resize the device vectors
     void set_tile_sizes(int tile_size_m, int tile_size_n, int tile_size_k);
     void set_tile_sizes(int tile_size);
+    void set_full_sizes(int m, int n, int k);
     // returns the tile sizes that are actually used for 
     // given problem size: m, n, k
     std::tuple<int, int, int> optimal_tile_sizes(int m, int n, int k);
@@ -38,6 +39,7 @@ public:
     device_buffer<Scalar>& get_device_buffer_a();
     device_buffer<Scalar>& get_device_buffer_b();
     device_buffer<Scalar>& get_device_buffer_c();
+    device_vector<Scalar>& get_full_device_buffer_c();
 
 private:
     int n_streams = 2;
@@ -51,7 +53,8 @@ private:
 
     device_buffer<Scalar> a_buff;
     device_buffer<Scalar> b_buff;
-    device_buffer<Scalar> c_buff;
+    device_buffer<Scalar> c_buff; // this holds just a single tile of C for each stream
+    device_vector<Scalar> full_c_buff; // this holds the full C matrix
 };
 
 template <typename Scalar>

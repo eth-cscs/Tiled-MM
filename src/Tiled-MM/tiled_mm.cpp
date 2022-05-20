@@ -422,7 +422,7 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
                 gpu::runtime_api::flag::HostRegisterDefault);
         gpu::check_runtime_status(status);
         // pin matrix C
-        if (copy_c_back == true) {
+        if (copy_c_back == true || std::abs(beta) >0) {
             status = gpu::runtime_api::host_register(
                     c,
                     m * n * sizeof(Scalar),
@@ -481,7 +481,7 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         status = gpu::runtime_api::host_unregister(b);
         gpu::check_runtime_status(status);
         // unpin matrix C
-        if (copy_c_back == true) {
+        if (copy_c_back == true || std::abs(beta) >0) {
             status = gpu::runtime_api::host_unregister(c);
             gpu::check_runtime_status(status);
         }

@@ -151,7 +151,12 @@ int main(int argc, char** argv){
     // VERSION WITH COPYING C BACK
     bool copy_c_back = true;
     // compute c = alpha * a * b + beta * c
+
+    auto start = std::chrono::steady_clock::now();
     gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, false, copy_c_back);
+    auto end = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "Time [ms] with copying C back: " << duration << std::endl;
 
     if (small_sizes) {
         std::cout << "Computed result by Tiled-MM with copying C back : " << std::endl;
@@ -162,10 +167,11 @@ int main(int argc, char** argv){
 
     // VERSION WITHOUT COPYING C BACK
     // compute the same but don't copy c back
+    start = std::chrono::steady_clock::now();
     gpu::gemm(*ctx, a_host, b_host, c_host2, M, N, K, alpha, beta, false, !copy_c_back);
-    auto status =
-    gpu::runtime_api::device_synchronize();
-    gpu::check_runtime_status(status);
+    end = std::chrono::steady_clock::now();
+    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    std::cout << "Time [ms] without copying C back: " << duration << std::endl;
 
     gpu::copy_to_host(ctx->get_full_device_buffer_c().data(), c_host2, M * N);
 

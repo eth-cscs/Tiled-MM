@@ -35,13 +35,22 @@ int main(int argc, char** argv){
 
     auto ctx = gpu::make_context<double>(2, 5000, 5000, 5000);
 
+    std::cout << "==============================================" << std::endl;
+    std::cout << "The version with copying C to back to host: " << std::endl;
+    std::cout << "==============================================" << std::endl;
+
     auto start = std::chrono::steady_clock::now();
-    for(int i=0; i<num_runs; ++i) {
+    for(int i=0; i<num_runs + 1; ++i) {
         // compute c = alpha * a * b + beta * c
         // no need to pin the memory, since matrices already pinned
+        if (i == 1) {
+            start = std::chrono::steady_clock::now();
+        }
         bool pin_buffers = false;
-        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers);
+        bool copy_c_back = true;
+        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
     }
+
     auto end = std::chrono::steady_clock::now();
     auto time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -49,6 +58,31 @@ int main(int argc, char** argv){
     std::cout << "Avg Time [ms] = " << time_per_mul << std::endl;
 
     auto flops = flops_per_mul / (1e-3 * time_per_mul) / 1e9;
+    std::cout << "Throughput [Gflops] = " << flops << std::endl;
+
+    std::cout << "==============================================" << std::endl;
+    std::cout << "The version without copying C to back to host: " << std::endl;
+    std::cout << "==============================================" << std::endl;
+
+    start = std::chrono::steady_clock::now();
+    for(int i=0; i<num_runs+1; ++i) {
+        // compute c = alpha * a * b + beta * c
+        // no need to pin the memory, since matrices already pinned
+        if (i == 1) {
+            start = std::chrono::steady_clock::now();
+        }
+        bool pin_buffers = false;
+        bool copy_c_back = false;
+        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
+    }
+
+    end = std::chrono::steady_clock::now();
+    time = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    time_per_mul =  time / num_runs;
+    std::cout << "Avg Time [ms] = " << time_per_mul << std::endl;
+
+    flops = flops_per_mul / (1e-3 * time_per_mul) / 1e9;
     std::cout << "Throughput [Gflops] = " << flops << std::endl;
 
     return 0;

@@ -297,12 +297,13 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
         device_buffer<Scalar>& b_device,
         tiled_matrix<Scalar>& tiled_c_device,
         int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
-
     int n_tiles_m, n_tiles_n, n_tiles_k;
     std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
 
     int n_streams = std::min(handle.get_num_streams(), n_tiles_m * n_tiles_n);
     auto& gpu_ctx = handle.get_gpu_context();
+
+    std::vector<device_event> copied_to_device(n_streams);
 
     for (int i = 0; i < n_tiles_m * n_tiles_n; i += n_streams) {
         for (int k_tile_id = 0; k_tile_id < n_tiles_k; ++k_tile_id) {
@@ -327,6 +328,9 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
                     auto c_device_ptr = tiled_c_device.tile_data({m_tile_id, n_tile_id});
 
                     if (round == 0) {
+                        int prev_stream_id = (stream_id + n_streams - 1) % n_streams;
+                        current_stream.wait_on_event(copied_to_device[prev_stream_id]);
+
                         // copy A tile
                         copy_tile_to_device_async(a_host, a_device,
                                 {m_tile_id, k_tile_id},
@@ -348,6 +352,9 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
                                     gpu_ctx, 
                                     stream_id);
                         }
+
+                        copied_to_device[stream_id] = current_stream.enqueue_event();
+
                     } else {
                         // perform dgemm
                         auto status = cublas_gemm_wrapper(

@@ -29,18 +29,16 @@ set (TILEDMM_EXTERNAL_LIBRARIES)
 # Dependencies
 #
 if(TILEDMM_GPU_BACKEND STREQUAL "CUDA")
-    find_package(CUDA REQUIRED)
+    find_package(CUDAToolkit REQUIRED)
     # this seems to be a cmake bug that was fixed in 3.12.2
     if(CUDA_VERSION VERSION_GREATER 9.1 AND CMAKE_VERSION VERSION_LESS 3.12.2)
          list(REMOVE_ITEM CUDA_CUBLAS_LIBRARIES "CUDA_cublas_device_LIBRARY-NOTFOUND")
     endif()
-    if (NOT TARGET CUDA::cudalibs) 
-        add_library(CUDA::cudalibs INTERFACE IMPORTED)
-        set_target_properties(CUDA::cudalibs PROPERTIES
-                                         INTERFACE_INCLUDE_DIRECTORIES "${CUDA_INCLUDE_DIRS}"
-                                         INTERFACE_LINK_LIBRARIES "${CUDA_LIBRARIES};${CUDA_CUBLAS_LIBRARIES}")
+    if (NOT TARGET tiledmm::cuda)
+        add_library(tiledmm::cuda INTERFACE IMPORTED)
+        target_link_libraries(tiledmm::cuda INTERFACE CUDA::cublas CUDA::cudart)
     endif()
-    list(APPEND TILEDMM_EXTERNAL_LIBRARIES CUDA::cudalibs)
+    list(APPEND TILEDMM_EXTERNAL_LIBRARIES tiledmm::cuda)
     list(APPEND TILEDMM_DEFINITIONS TILED_MM_CUDA)
 
 elseif(TILEDMM_GPU_BACKEND STREQUAL "ROCM")
@@ -78,7 +76,7 @@ if(TILEDMM_WITH_INSTALL)
             NAMESPACE Tiled-MM::
             DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tiled-MM")
 
-    install(DIRECTORY "${Tiled-MM_SOURCE_DIR}/src/Tiled-MM" 
+    install(DIRECTORY "${Tiled-MM_SOURCE_DIR}/src/Tiled-MM"
             DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
             FILES_MATCHING PATTERN "*.hpp")
 

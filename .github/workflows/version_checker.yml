@@ -8,7 +8,7 @@ on:
 jobs:
   checker:
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v2
     - name: Version check
@@ -18,7 +18,7 @@ jobs:
            cd build 
            cmake .. 
            CMAKE_VERSION="v$(cat CMakeCache.txt | grep '^CMAKE_PROJECT_VERSION\b' | cut -d "=" -f2)"
-           GIT_VERSION=$(git describe --tags)
+           GIT_VERSION=$(git describe --tags --abbrev=0)
            if [ "$CMAKE_VERSION" != "$GIT_VERSION" ]; then
              echo ::set-output name=CMAKE_ISSUE::yes
              echo ::set-output name=CMAKE_VERSION::$CMAKE_VERSION

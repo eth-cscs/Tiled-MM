@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 set(MASTER_PROJECT OFF)
 if(NOT DEFINED PROJECT_NAME)

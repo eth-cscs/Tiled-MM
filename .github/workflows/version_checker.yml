@@ -10,12 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Version check
       id: check
       run: |
-           mkdir build 
-           cd build 
+           mkdir build
+           cd build
            cmake .. || true
            CMAKE_VERSION="v$(cat CMakeCache.txt | grep '^CMAKE_PROJECT_VERSION\b' | cut -d "=" -f2)"
            GIT_VERSION=$(git describe --tags --abbrev=0)

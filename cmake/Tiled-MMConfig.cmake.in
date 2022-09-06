@@ -5,8 +5,7 @@ if(NOT TARGET Tiled-MM::Tiled-MM)
     set(TILEDMM_GPU_BACKEND "@TILEDMM_GPU_BACKEND@")
 
     if(TILEDMM_GPU_BACKEND STREQUAL "CUDA")
-        find_package(CUDA REQUIRED)
-        find_package(CUBLAS REQUIRED)
+        find_package(CUDAToolkit REQUIRED)
     endif()
 
     if(TILEDMM_GPU_BACKEND STREQUAL "ROCM")

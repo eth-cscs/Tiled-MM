@@ -138,6 +138,18 @@ std::tuple<int, int, int> get_tile_sizes(tiled_matrix<Scalar>& a,
 }
 
 
+blas_api::OperationType get_blas_operation(char trans) {
+    blas_api::OperationType op = trans == 'T'
+	                            ? 
+				    blas_api::operation::Transpose 
+			            : 
+				    (trans == 'C'
+			                ? 
+					blas_api::operation::ConjugateTranspose 
+			                : 
+					blas_api::operation::None);
+    return op;
+}
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
 		                   char trans_a, char trans_b,
@@ -148,16 +160,8 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const float* beta,
                                    float* c, 
                                    int lld_c) {
-    blas_api::OperationType op_a = trans_a == 'T'
-	                              ? blas_api::operation::Transpose 
-				      : (trans_a == 'C'
-				          ? blas_api::operation::ConjugateTranspose 
-					  : blas_api::operation::None);
-    blas_api::OperationType op_b = trans_b == 'T'
-	                              ? blas_api::operation::Transpose 
-				      : (trans_b == 'C'
-				          ? blas_api::operation::ConjugateTranspose 
-					  : blas_api::operation::None);
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
 
     return blas_api::sgemm(handle, op_a, op_b, m, n, k,
                          alpha, a, m, b, k, beta, c, lld_c);
@@ -172,6 +176,8 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const double* beta,
                                    double* c,
                                    int lld_c) {
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
     return blas_api::dgemm(handle, blas_api::operation::Transpose, blas_api::operation::None, m, n, k,
                          alpha, a, m, b, k, beta, c, lld_c);
 }
@@ -190,7 +196,9 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const zfloat* beta,
                                    zfloat* c,
                                    int lld_c) {
-  return blas_api::cgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+    return blas_api::cgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
                          reinterpret_cast<const blas_api::ComplexFloatType*>(alpha),
                          reinterpret_cast<const blas_api::ComplexFloatType*>(a), m,
                          reinterpret_cast<const blas_api::ComplexFloatType*>(b), k,
@@ -207,7 +215,9 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const zdouble* beta,
                                    zdouble* c,
                                    int lld_c) {
-  return blas_api::zgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+    return blas_api::zgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(alpha),
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(a), m,
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(b), k,

@@ -66,6 +66,7 @@ namespace gpu {
 // **************************************
 template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
+	  char trans_a, char trans_b, 
           int m, int n, int k,
           Scalar alpha, Scalar beta, bool pin_host_buffers = true, bool copy_c_back=true);
 

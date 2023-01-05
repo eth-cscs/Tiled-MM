@@ -140,6 +140,7 @@ std::tuple<int, int, int> get_tile_sizes(tiled_matrix<Scalar>& a,
 
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const float* alpha,
                                    const float* a,
@@ -147,11 +148,23 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const float* beta,
                                    float* c, 
                                    int lld_c) {
-  return blas_api::sgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    blas_api::OperationType op_a = trans_a == 'T'
+	                              ? blas_api::operation::Transpose 
+				      : (trans_a == 'C'
+				          ? blas_api::operation::ConjugateTranspose 
+					  : blas_api::operation::None);
+    blas_api::OperationType op_b = trans_b == 'T'
+	                              ? blas_api::operation::Transpose 
+				      : (trans_b == 'C'
+				          ? blas_api::operation::ConjugateTranspose 
+					  : blas_api::operation::None);
+
+    return blas_api::sgemm(handle, op_a, op_b, m, n, k,
                          alpha, a, m, b, k, beta, c, lld_c);
 }
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const double* alpha,
                                    const double* a,
@@ -159,7 +172,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const double* beta,
                                    double* c,
                                    int lld_c) {
-  return blas_api::dgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    return blas_api::dgemm(handle, blas_api::operation::Transpose, blas_api::operation::None, m, n, k,
                          alpha, a, m, b, k, beta, c, lld_c);
 }
 
@@ -169,6 +182,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
 //       http://icl.cs.utk.edu/magma/forum/viewtopic.php?f=2&t=902
 //
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const zfloat* alpha,
                                    const zfloat* a,
@@ -185,6 +199,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
 }
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const zdouble* alpha,
                                    const zdouble* a,
@@ -205,7 +220,9 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
         device_buffer<Scalar>& a_device,
         device_buffer<Scalar>& b_device,
         device_buffer<Scalar>& c_device,
-        int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
+        char trans_a, char trans_b,
+	int m, int n, int k, 
+	Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
 
     int n_tiles_m, n_tiles_n, n_tiles_k;
     std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
@@ -266,6 +283,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
 
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
+				trans_a, trans_b,
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
@@ -296,6 +314,7 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
         device_buffer<Scalar>& a_device,
         device_buffer<Scalar>& b_device,
         tiled_matrix<Scalar>& tiled_c_device,
+	char trans_a, char trans_b,
         int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
     int n_tiles_m, n_tiles_n, n_tiles_k;
     std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
@@ -359,6 +378,7 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
                         // perform dgemm
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
+				trans_a, trans_b,
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
@@ -412,27 +432,42 @@ void gpu_dgemm_(mm_handle& m_handle, double* a, double* b, double* c,
 */
 template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c, 
+	char transa, char transb,
         int m, int n, int k,
         Scalar alpha, Scalar beta, bool pin_host_buffers, bool copy_c_back) {
+
+    char trans_a = std::toupper(transa);
+    char trans_b = std::toupper(transb);
+
+    // sumatrix size to multiply
+    int a_subm = trans_a == 'N' ? m : k;
+    int a_subn = trans_a == 'N' ? k : m;
+
+    int b_subm = trans_b == 'N' ? k : n;
+    int b_subn = trans_b == 'N' ? n : k;
+
+    int c_subm = m;
+    int c_subn = n;
+
     if (pin_host_buffers) {
         // pin matrix A
         // auto start = std::chrono::steady_clock::now();
         auto status = gpu::runtime_api::host_register(
                 a,
-                m * k * sizeof(Scalar),
+                a_subm * a_subn * sizeof(Scalar),
                 gpu::runtime_api::flag::HostRegisterDefault);
         gpu::check_runtime_status(status);
         // pin matrix B
         status = gpu::runtime_api::host_register(
                 b,
-                k * n * sizeof(Scalar),
+                b_subm * b_subn * sizeof(Scalar),
                 gpu::runtime_api::flag::HostRegisterDefault);
         gpu::check_runtime_status(status);
         // pin matrix C
         if (copy_c_back == true || std::abs(beta) >0) {
             status = gpu::runtime_api::host_register(
                     c,
-                    m * n * sizeof(Scalar),
+                    c_subm * c_subn * sizeof(Scalar),
                     gpu::runtime_api::flag::HostRegisterDefault);
             gpu::check_runtime_status(status);
         }
@@ -450,10 +485,20 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         handle.set_full_sizes(m, n, k);
     }
 
+    // tile sizes
+    int a_tile_subm = trans_a == 'N' ? tile_size_m : tile_size_k;
+    int a_tile_subn = trans_a == 'N' ? tile_size_k : tile_size_m;
+
+    int b_tile_subm = trans_b == 'N' ? tile_size_k : tile_size_n;
+    int b_tile_subn = trans_b == 'N' ? tile_size_n : tile_size_k;
+
+    int c_tile_subm = tile_size_m;
+    int c_tile_subn = tile_size_n;
+
     // set these tile sizes to CPU matrices
-    tiled_matrix<Scalar> a_host(a, m, k, {tile_size_m, tile_size_k});
-    tiled_matrix<Scalar> b_host(b, k, n, {tile_size_k, tile_size_n});
-    tiled_matrix<Scalar> c_host(c, m, n, {tile_size_m, tile_size_n});
+    tiled_matrix<Scalar> a_host(a, a_subm, a_subn, {a_tile_subm, a_tile_subn});
+    tiled_matrix<Scalar> b_host(b, b_subm, b_subn, {b_tile_subm, b_tile_subn});
+    tiled_matrix<Scalar> c_host(c, c_subm, c_subn, {c_tile_subm, c_tile_subn});
 
     // get GPU matrices
     device_buffer<Scalar>& a_device = handle.get_device_buffer_a();
@@ -462,16 +507,18 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
 
     // used only when copy_c_back == false
     device_vector<Scalar>& full_c_device = handle.get_full_device_buffer_c();
-    tiled_matrix<Scalar> tiled_c_device(full_c_device.data(), m, n, {tile_size_m, tile_size_n});
+    tiled_matrix<Scalar> tiled_c_device(full_c_device.data(), c_subm, c_subn, {c_tile_subm, c_tile_subn});
 
     if (copy_c_back) {
         round_robin(a_host, b_host, c_host,
                     a_device, b_device, c_device,
+		    trans_a, trans_b,
                     m, n, k, alpha, beta, handle);
     } else {
         round_robin_without_copy_c(
                     a_host, b_host, c_host,
                     a_device, b_device, tiled_c_device,
+		    trans_a, trans_b,
                     m, n, k, alpha, beta, handle);
     }
 
@@ -502,18 +549,22 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
 
 
 template void gemm<float>(mm_handle<float>& handle, float* a, float* b, float* c,
+	char trans_a, char trans_b,
         int m, int n, int k,
         float alpha, float beta, bool pin_host_buffers, bool copy_c_back);
 
 template void gemm<double>(mm_handle<double>& handle, double* a, double* b, double* c,
+	char trans_a, char trans_b,
         int m, int n, int k,
         double alpha, double beta, bool pin_host_buffers, bool copy_c_back);
 
 template void gemm<zfloat>(mm_handle<zfloat>& handle, zfloat* a, zfloat* b, zfloat* c,
+	char trans_a, char trans_b,
         int m, int n, int k,
         zfloat alpha, zfloat beta, bool pin_host_buffers, bool copy_c_back);
 
 template void gemm<zdouble>(mm_handle<zdouble>& handle, zdouble* a, zdouble* b, zdouble* c,
+	char trans_a, char trans_b,
         int m, int n, int k,
         zdouble alpha, zdouble beta, bool pin_host_buffers, bool copy_c_back);
 

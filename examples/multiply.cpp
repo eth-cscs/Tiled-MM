@@ -48,7 +48,7 @@ int main(int argc, char** argv){
         }
         bool pin_buffers = false;
         bool copy_c_back = true;
-        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
+        gpu::gemm(*ctx, a_host, b_host, c_host, 'N', 'N', M, N, K, alpha, beta, pin_buffers, copy_c_back);
     }
 
     auto end = std::chrono::steady_clock::now();
@@ -73,7 +73,7 @@ int main(int argc, char** argv){
         }
         bool pin_buffers = false;
         bool copy_c_back = false;
-        gpu::gemm(*ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
+        gpu::gemm(*ctx, a_host, b_host, c_host, 'N', 'N', M, N, K, alpha, beta, pin_buffers, copy_c_back);
     }
 
     end = std::chrono::steady_clock::now();

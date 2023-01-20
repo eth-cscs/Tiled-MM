@@ -96,7 +96,7 @@ if(TILEDMM_WITH_INSTALL)
 endif()
 
 if(TILEDMM_WITH_TESTS OR TILEDMM_WITH_EXAMPLES)
-    add_subdirectory(libs/options)
+    add_subdirectory(libs/cxxopts)
 endif()
 
 if(TILEDMM_WITH_TESTS)

@@ -3,15 +3,16 @@
 #include <Tiled-MM/util.hpp>
 #include <Tiled-MM/gpu_blas_handle.hpp>
 #include <Tiled-MM/gpu_blas_api.hpp>
+#include <Tiled-MM/gpu_runtime_api.hpp>
 
-#include <options.hpp>
 #include <iostream>
 #include <cmath>
 #include <cstdio>
 #include <chrono>
 #include <random>
 
-#include "Tiled-MM/gpu_runtime_api.hpp"
+#include <cxxopts.hpp>
+
 void compute_reference(double* a, double* b, double* c,
         int m, int n, int k,
 	int ld_a, int ld_b, int ld_c,
@@ -101,16 +102,92 @@ void print_matrix(T* mat, int m, int n, char trans) {
 }
 
 int main(int argc, char** argv){
-    options::initialize(argc, argv);
+    cxxopts::Options options("Testing Tiled-MM", "Tests the result of correctness of the Tiled-MM algorithm.");
 
-    auto m = options::next_long_long("-m", "--m_dim", "Number of rows of A and C.", 10000);
-    auto n = options::next_long_long("-n", "--n_dim", "Number of columns of B and C.", 10000);
-    auto k = options::next_long_long("-k", "--k_dim", "Number of columns of A and rows of B.", 10000);
+    options.add_options()
+	    ("m,m_dim", 
+	         "The number of rows of the resulting matrix C.", 
+		 cxxopts::value<int>()->default_value("1000"))
+	    ("n,n_dim", 
+	         "The number of columns of the resulting matrix C.", 
+		 cxxopts::value<int>()->default_value("1000"))
+	    ("k,k_dim", 
+	         "The size of the shared dimension between matrices A and B.", 
+		 cxxopts::value<int>()->default_value("1000"))
+	    ("tile_m", 
+	        "The tile size for dimension m.", 
+		cxxopts::value<int>()->default_value("5000"))
+	    ("tile_n", 
+	        "The tile size for dimension n.", 
+		cxxopts::value<int>()->default_value("5000"))
+	    ("tile_k", 
+	        "The tile size for dimension k.", 
+		cxxopts::value<int>()->default_value("5000"))
+	    ("n_streams", 
+	        "The number of GPU streams to use.", 
+		cxxopts::value<int>()->default_value("2"))
+	    ("ld_a", 
+	         "The leading dimension of matrix A.", 
+		 cxxopts::value<int>()->default_value("0"))
+	    ("ld_b", 
+	         "The leading dimension of matrix B.", 
+		 cxxopts::value<int>()->default_value("0"))
+	    ("ld_c", 
+	         "The leading dimension of matrix C.", 
+		 cxxopts::value<int>()->default_value("0"))
+	    ("t,transpose", 
+	         "Whether matrices A and B are not-transposed (N), transposed (T) or transpose-conjugated (C). \
+	          For example, passing NT means that matrix A is not transposed, whereas the matrix B is transposed.", 
+	          cxxopts::value<std::string>()->default_value("NN"))
+	    ("alpha", 
+	         "The constant alpha in: C = beta*C + alpha*A*B.", 
+		 cxxopts::value<double>()->default_value("1.0"))
+	    ("beta", "The constant beta in: C = beta*C + alpha*A*B.", 
+	         cxxopts::value<double>()->default_value("0.0"))
+	    ;
 
-    char trans_a = 'N';
-    char trans_b = 'N';
+    auto result = options.parse(argc, argv);
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    }
 
-    // sumatrix size to multiply
+    auto m = result["m_dim"].as<int>();
+    auto n = result["n_dim"].as<int>();
+    auto k = result["k_dim"].as<int>();
+
+    auto tile_m = result["tile_m"].as<int>();
+    auto tile_n = result["tile_n"].as<int>();
+    auto tile_k = result["tile_k"].as<int>();
+
+    auto n_streams = result["n_streams"].as<int>();
+
+    auto transpose = result["transpose"].as<std::string>();
+    // transform to upper-case
+    std::transform(transpose.begin(), transpose.end(), transpose.begin(),
+        [&](char c) {
+            return std::toupper(c);
+        }
+    );
+    std::unordered_set<std::string> transpose_options = {
+        "NN", "TT", "NT", "TN"
+    };
+
+    // check if transpose takes a correct value
+    if (std::find(transpose_options.begin(), transpose_options.end(), transpose) == transpose_options.end()) {
+        std::cout << "[ERROR]: --transpose option \
+        can only take the following values: " << std::endl;
+        for (const auto& el : transpose_options) {
+            std::cout << el << ", ";
+        }
+        std::cout << std::endl;
+        return 0;
+    }
+
+    auto trans_a = transpose[0];
+    auto trans_b = transpose[1];
+
+    // matrix sizes to multiply
     int a_m = trans_a == 'N' ? m : k;
     int a_n = trans_a == 'N' ? k : m;
 
@@ -120,13 +197,53 @@ int main(int argc, char** argv){
     int c_m = m;
     int c_n = n;
 
-    int ld_a = a_m;
-    int ld_b = b_m;
-    int ld_c = c_m;
+    int ld_a = std::max(a_m, result["ld_a"].as<int>());
+    int ld_b = std::max(b_m, result["ld_b"].as<int>());
+    int ld_c = std::max(c_m, result["ld_c"].as<int>());
+
+    auto alpha = result["alpha"].as<double>();
+    auto beta = result["beta"].as<double>();
+
+    int num_reps = 1; // since testing
 
     bool small_sizes = std::max(m, std::max(n, k)) < 20;
 
-    std::cout << "Multiplying: (M, N, K) = (" << m << ", " << n << ", " << k << ")\n";
+    std::cout << "==================================================" << std::endl;
+    std::cout << "                Benchmarking Tiled-MM    " << std::endl;
+    std::cout << "==================================================" << std::endl;
+    std::cout << "         MATRIX SIZES " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " A = (" << a_m << ", " << a_n << ")" << std::endl;
+    std::cout << " B = (" << b_m << ", " << b_n << ")" << std::endl;
+    std::cout << " C = (" << c_m << ", " << c_n << ")" << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << "         LEADING DIMS " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " LD_A = " << ld_a << std::endl;
+    std::cout << " LD_B = " << ld_b << std::endl;
+    std::cout << " LD_C = " << ld_c << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << "      SCALING CONSTANTS " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " alpha = " << alpha << std::endl;
+    std::cout << " beta  = " << alpha << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << "      TRANSPOSE FLAGS " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " trans_a = " << trans_a << std::endl;
+    std::cout << " trans_b = " << trans_b << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << "         TILE SIZES " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " tile_m = " << tile_m << std::endl;
+    std::cout << " tile_n = " << tile_n << std::endl;
+    std::cout << " tile_k = " << tile_k << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << "      ADDITIONAL OPTIONS " << std::endl;
+    std::cout << "=============================" << std::endl;
+    std::cout << " num. of gpu streams = " << n_streams << std::endl;
+    std::cout << " num. of repetitions = " << num_reps << std::endl;
+    std::cout << "=============================" << std::endl;
 
     // A dimensions: MxK
     auto a_host = gpu::malloc_pinned<value_type>(a_m * a_n, 1);
@@ -153,9 +270,6 @@ int main(int argc, char** argv){
         print_matrix(c_host, c_m, c_n, 'N');
     }
 
-    value_type alpha{1.};
-    value_type beta{1.};
-
     compute_reference(a_host, b_host, c_host_reference, 
 		      m, n, k, 
 		      ld_a, ld_b, ld_c,
@@ -163,21 +277,25 @@ int main(int argc, char** argv){
 		      trans_a, trans_b);
 
     if (small_sizes) {
-        std::cout << "Correct result C = C + A*B: " << std::endl;
+        std::cout << "Correct result C = beta*C + alpha*A*B: " << std::endl;
         print_matrix(c_host_reference, m, n, 'N');
     }
 
-    auto ctx = gpu::make_context<double>();
+    auto ctx = gpu::make_context<double>(n_streams, tile_m, tile_n, tile_k);
+
     // VERSION WITH COPYING C BACK
     bool copy_c_back = true;
     // compute c = alpha * a * b + beta * c
 
     auto start = std::chrono::steady_clock::now();
-    gpu::gemm(*ctx, a_host, b_host, c_host, 
+    gpu::gemm(*ctx,
               trans_a, trans_b, 
               m, n, k, 
-	      ld_a, ld_b, ld_c, 
-	      alpha, beta, 
+	      alpha,
+	      a_host, ld_a,
+	      b_host, ld_b,
+	      beta,
+	      c_host, ld_c,
 	      false, copy_c_back);
     auto end = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -193,11 +311,14 @@ int main(int argc, char** argv){
     // VERSION WITHOUT COPYING C BACK
     // compute the same but don't copy c back
     start = std::chrono::steady_clock::now();
-    gpu::gemm(*ctx, a_host, b_host, c_host2, 
+    gpu::gemm(*ctx,
               trans_a, trans_b, 
 	      m, n, k, 
-	      ld_a, ld_b, ld_c, 
-	      alpha, beta, 
+	      alpha, 
+	      a_host, ld_a,
+	      b_host, ld_b,
+	      beta, 
+	      c_host2, ld_c,
 	      false, !copy_c_back);
     end = std::chrono::steady_clock::now();
     duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

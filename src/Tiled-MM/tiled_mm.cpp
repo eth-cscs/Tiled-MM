@@ -491,11 +491,14 @@ void gpu_dgemm_(mm_handle& m_handle, double* a, double* b, double* c,
 */
 template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, 
-	  Scalar* a, Scalar* b, Scalar* c, 
 	  char transa, char transb,
           int m, int n, int k,
-	  int ld_a, int ld_b, int ld_c,
-          Scalar alpha, Scalar beta, bool pin_host_buffers, bool copy_c_back) {
+	  Scalar alpha,
+	  Scalar* a, int ld_a,
+	  Scalar* b, int ld_b, 
+	  Scalar beta,
+	  Scalar* c, int ld_c,
+          bool pin_host_buffers, bool copy_c_back) {
 
     char trans_a = std::toupper(transa);
     char trans_b = std::toupper(transb);
@@ -509,6 +512,19 @@ void gemm(mm_handle<Scalar>& handle,
 
     int c_subm = m;
     int c_subn = n;
+
+    // check the leading dimensions
+    if (ld_a < a_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix A must be >= the number of rows.");
+    }
+    // check the leading dimensions
+    if (ld_b < b_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix B must be >= the number of rows.");
+    }
+    // check the leading dimensions
+    if (ld_c < c_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix C must be >= the number of rows.");
+    }
 
     if (pin_host_buffers) {
         // pin matrix A
@@ -607,28 +623,48 @@ void gemm(mm_handle<Scalar>& handle,
     }
 }
 
-template void gemm<float>(mm_handle<float>& handle, float* a, float* b, float* c,
-	char trans_a, char trans_b,
-        int m, int n, int k,
-	int ld_a, int ld_b, int ld_c,
-        float alpha, float beta, bool pin_host_buffers, bool copy_c_back);
+template void gemm<float>(
+	mm_handle<float>& handle,
+	char transa, char transb,
+	int m, int n, int k,
+	float alpha,
+	float* a, int ld_a,
+	float* b, int ld_b, 
+	float beta,
+	float* c, int ld_c,
+	bool pin_host_buffers, bool copy_c_back);
 
-template void gemm<double>(mm_handle<double>& handle, double* a, double* b, double* c,
-	char trans_a, char trans_b,
+template void gemm<double>(
+	mm_handle<double>& handle,
+	char transa, char transb,
         int m, int n, int k,
-	int ld_a, int ld_b, int ld_c,
-        double alpha, double beta, bool pin_host_buffers, bool copy_c_back);
+	double alpha,
+	double* a, int ld_a,
+	double* b, int ld_b, 
+	double beta,
+	double* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
-template void gemm<zfloat>(mm_handle<zfloat>& handle, zfloat* a, zfloat* b, zfloat* c,
-	char trans_a, char trans_b,
+template void gemm<zfloat>(
+	mm_handle<zfloat>& handle,
+	char transa, char transb,
         int m, int n, int k,
-	int ld_a, int ld_b, int ld_c,
-        zfloat alpha, zfloat beta, bool pin_host_buffers, bool copy_c_back);
+	zfloat alpha,
+	zfloat* a, int ld_a,
+	zfloat* b, int ld_b, 
+	zfloat beta,
+	zfloat* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
-template void gemm<zdouble>(mm_handle<zdouble>& handle, zdouble* a, zdouble* b, zdouble* c,
-	char trans_a, char trans_b,
+template void gemm<zdouble>(
+	mm_handle<zdouble>& handle,
+	char transa, char transb,
         int m, int n, int k,
-	int ld_a, int ld_b, int ld_c,
-        zdouble alpha, zdouble beta, bool pin_host_buffers, bool copy_c_back);
+	zdouble alpha,
+	zdouble* a, int ld_a,
+	zdouble* b, int ld_b, 
+	zdouble beta,
+	zdouble* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
 }

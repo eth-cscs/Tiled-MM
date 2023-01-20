@@ -29,6 +29,19 @@ namespace gpu {
 using zfloat = std::complex<float>;
 using zdouble = std::complex<double>;
 
+int get_first(char trans, int m, int n) {
+    return trans == 'N' ? m : n;
+}
+
+int get_second(char trans, int m, int n) {
+    return trans == 'N' ? n : m;
+}
+
+gpu::tile_coord swap_if_transposed(char trans, int m, int n) {
+    return trans == 'N' ? gpu::tile_coord(m, n) : gpu::tile_coord(n, m);
+}
+
+
 template<typename Scalar>
 void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer,
         tile_coord tile, device_stream& stream) {
@@ -40,7 +53,7 @@ void copy_tile_to_device_async(tiled_matrix<Scalar>& tiled_mat, Scalar* d_buffer
 
     auto status=
     runtime_api::memcpy_2d_async(to, tile_dims.rows() * sizeof(Scalar),
-            from, tiled_mat.rows() * sizeof(Scalar),
+            from, tiled_mat.leading_dim() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
             runtime_api::flag::MemcpyHostToDevice, stream.stream());
     check_runtime_status(status);
@@ -67,7 +80,7 @@ void strided_copy_tile_to_device_async(
 
     auto status=
     runtime_api::memcpy_2d_async(to, device_stride * sizeof(Scalar),
-            from, tiled_mat.rows() * sizeof(Scalar),
+            from, tiled_mat.leading_dim() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
             runtime_api::flag::MemcpyHostToDevice, stream.stream());
     check_runtime_status(status);
@@ -96,7 +109,7 @@ void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat,
 
     // std::cout << "device->host" << std::endl;
     auto status=
-    runtime_api::memcpy_2d_async(to, tiled_mat.rows() * sizeof(Scalar),
+    runtime_api::memcpy_2d_async(to, tiled_mat.leading_dim() * sizeof(Scalar),
             from, tile_dims.rows() * sizeof(Scalar),
             tile_dims.rows() * sizeof(Scalar), tile_dims.cols(),
             runtime_api::flag::MemcpyDeviceToHost, stream.stream());
@@ -111,35 +124,62 @@ void copy_tile_to_host_async(tiled_matrix<Scalar>& tiled_mat, device_buffer<Scal
 
 
 template<typename Scalar>
-std::tuple<int, int, int> get_num_tiles(tiled_matrix<Scalar>& a, tiled_matrix<Scalar>& b, tiled_matrix<Scalar>& c) {
-    if (a.num_tiles_row() != c.num_tiles_row() ||
-            a.num_tiles_col() != b.num_tiles_row() ||
-            b.num_tiles_col() != c.num_tiles_col()) {
-        throw std::runtime_error("Number of tiles mismatch in tiled_matrix inside get_num_tiles.");
-    }
-    return {a.num_tiles_row(), c.num_tiles_col(), b.num_tiles_row()};
+std::tuple<int, int, int> get_num_tiles(tiled_matrix<Scalar>& a, tiled_matrix<Scalar>& b, tiled_matrix<Scalar>& c,
+		                        int m, int n, int k,
+					char trans_a, char trans_b) {
+    int tile_size_m, tile_size_n, tile_size_k;
+    auto tile_c = c.tile_dimensions();
+    tile_size_m = tile_c.rows();
+    tile_size_n = tile_c.cols();
+
+    auto a_tile = a.tile_dimensions();
+    int temp_m = a_tile.rows();
+    int temp_k = a_tile.cols();
+
+    tile_size_k = trans_a == 'N' ? temp_k : temp_m;
+
+    int n_tiles_m = (int) std::ceil(1.0 * m / tile_size_m);
+    int n_tiles_n = (int) std::ceil(1.0 * n / tile_size_n);
+    int n_tiles_k = (int) std::ceil(1.0 * k / tile_size_k);
+
+    return {n_tiles_m, n_tiles_n, n_tiles_k};
 }
 
 
 template<typename Scalar>
 std::tuple<int, int, int> get_tile_sizes(tiled_matrix<Scalar>& a,
         tiled_matrix<Scalar>& b, tiled_matrix<Scalar>& c,
-        int m_tile_id, int n_tile_id, int k_tile_id) {
-    tile_dim a_dim = a.tile_dimensions({m_tile_id, k_tile_id});
-    tile_dim b_dim = b.tile_dimensions({k_tile_id, n_tile_id});
-    tile_dim c_dim = c.tile_dimensions({m_tile_id, n_tile_id});
+        int m_tile_id, int n_tile_id, int k_tile_id,
+	char trans_a, char trans_b) {
+    int tile_size_m, tile_size_n, tile_size_k;
+    auto tile_c = c.tile_dimensions();
+    tile_size_m = tile_c.rows();
+    tile_size_n = tile_c.cols();
 
-    if (a_dim.cols() != b_dim.rows() ||
-            a_dim.rows() != c_dim.rows() ||
-            b_dim.cols() != c_dim.cols()) {
-        throw std::runtime_error("Tile dimension mismatch in device_buffers inside get_tile_sizes.");
-    }
-    return {a_dim.rows(), b_dim.cols(), a_dim.cols()};
+    auto a_tile = a.tile_dimensions();
+    int temp_m = a_tile.rows();
+    int temp_k = a_tile.cols();
+
+    tile_size_k = trans_a == 'N' ? temp_k : temp_m;
+    return {tile_size_m, tile_size_n, tile_size_k};
 }
 
 
+blas_api::OperationType get_blas_operation(char trans) {
+    blas_api::OperationType op = trans == 'T'
+	                            ? 
+				    blas_api::operation::Transpose 
+			            : 
+				    (trans == 'C'
+			                ? 
+					blas_api::operation::ConjugateTranspose 
+			                : 
+					blas_api::operation::None);
+    return op;
+}
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const float* alpha,
                                    const float* a,
@@ -147,11 +187,18 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const float* beta,
                                    float* c, 
                                    int lld_c) {
-  return blas_api::sgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
-                         alpha, a, m, b, k, beta, c, lld_c);
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+
+    int ld_a = get_first(trans_a, m , k);
+    int ld_b = get_first(trans_a, k , n);
+
+    return blas_api::sgemm(handle, op_a, op_b, m, n, k,
+                         alpha, a, ld_a, b, ld_b, beta, c, lld_c);
 }
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const double* alpha,
                                    const double* a,
@@ -159,8 +206,14 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const double* beta,
                                    double* c,
                                    int lld_c) {
-  return blas_api::dgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
-                         alpha, a, m, b, k, beta, c, lld_c);
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+
+    int ld_a = get_first(trans_a, m , k);
+    int ld_b = get_first(trans_b, k , n);
+
+    return blas_api::dgemm(handle, op_a, op_b, m, n, k,
+                         alpha, a, ld_a, b, ld_b, beta, c, lld_c);
 }
 
 // Note: Converting from std::complex to cuComplex and cuDoubleComple
@@ -169,6 +222,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
 //       http://icl.cs.utk.edu/magma/forum/viewtopic.php?f=2&t=902
 //
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const zfloat* alpha,
                                    const zfloat* a,
@@ -176,15 +230,22 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const zfloat* beta,
                                    zfloat* c,
                                    int lld_c) {
-  return blas_api::cgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+
+    int ld_a = get_first(trans_a, m , k);
+    int ld_b = get_first(trans_a, k , n);
+
+    return blas_api::cgemm(handle, op_a, op_b, m, n, k,
                          reinterpret_cast<const blas_api::ComplexFloatType*>(alpha),
-                         reinterpret_cast<const blas_api::ComplexFloatType*>(a), m,
-                         reinterpret_cast<const blas_api::ComplexFloatType*>(b), k,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(a), ld_a,
+                         reinterpret_cast<const blas_api::ComplexFloatType*>(b), ld_b,
                          reinterpret_cast<const blas_api::ComplexFloatType*>(beta),
                          reinterpret_cast<blas_api::ComplexFloatType*>(c), lld_c);
 }
 
 blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
+		                   char trans_a, char trans_b,
                                    int m, int n, int k,
                                    const zdouble* alpha,
                                    const zdouble* a,
@@ -192,10 +253,16 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
                                    const zdouble* beta,
                                    zdouble* c,
                                    int lld_c) {
-  return blas_api::zgemm(handle, blas_api::operation::None, blas_api::operation::None, m, n, k,
+    blas_api::OperationType op_a = get_blas_operation(trans_a);
+    blas_api::OperationType op_b = get_blas_operation(trans_b);
+
+    int ld_a = get_first(trans_a, m , k);
+    int ld_b = get_first(trans_a, k , n);
+
+    return blas_api::zgemm(handle, op_a, op_b, m, n, k,
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(alpha),
-                         reinterpret_cast<const blas_api::ComplexDoubleType*>(a), m,
-                         reinterpret_cast<const blas_api::ComplexDoubleType*>(b), k,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(a), ld_a,
+                         reinterpret_cast<const blas_api::ComplexDoubleType*>(b), ld_b,
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(beta),
                          reinterpret_cast<blas_api::ComplexDoubleType*>(c), lld_c);
 }
@@ -205,10 +272,14 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
         device_buffer<Scalar>& a_device,
         device_buffer<Scalar>& b_device,
         device_buffer<Scalar>& c_device,
-        int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
+        char trans_a, char trans_b,
+	int m, int n, int k, 
+	Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
 
     int n_tiles_m, n_tiles_n, n_tiles_k;
-    std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
+    std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host, 
+		                                              m, n, k, 
+							      trans_a, trans_b);
 
     int n_streams = std::min(handle.get_num_streams(), n_tiles_m * n_tiles_n);
     auto& gpu_ctx = handle.get_gpu_context();
@@ -232,7 +303,8 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                     int actual_size_m, actual_size_n, actual_size_k;
                     std::tie(actual_size_m, actual_size_n, actual_size_k) =
                         get_tile_sizes(a_host, b_host, c_host,
-                                m_tile_id, n_tile_id, k_tile_id);
+                                m_tile_id, n_tile_id, k_tile_id,
+				trans_a, trans_b);
 
                     Scalar new_beta = k_tile_id == 0 ? beta : Scalar{1};
 
@@ -241,19 +313,19 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                     if (round == 0) {
                         // copy A tile
                         copy_tile_to_device_async(a_host, a_device,
-                                {m_tile_id, k_tile_id},
+                                swap_if_transposed(trans_a, m_tile_id, k_tile_id),
                                 gpu_ctx, stream_id);
 
                         // copy B tile
                         copy_tile_to_device_async(b_host, b_device,
-                                {k_tile_id, n_tile_id},
+                                swap_if_transposed(trans_b, k_tile_id, n_tile_id),
                                 gpu_ctx, stream_id);
 
                         // copy C tile if this is the first partial result and beta > 0
                         if (k_tile_id == 0 && std::abs(beta) > 0) {
                             current_stream.wait_on_event(c_copied_to_host[stream_id]);
                             copy_tile_to_device_async(c_host, c_device,
-                                    {m_tile_id, n_tile_id},
+				    {m_tile_id, n_tile_id},
                                     gpu_ctx, stream_id);
                         }
                     } else {
@@ -266,6 +338,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
 
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
+				trans_a, trans_b,
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
@@ -279,7 +352,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                             // copy result back to host
                             result_stream.wait_on_event(c_computed_on_device[stream_id]);
                             copy_tile_to_host_async(c_host, c_device.stream_buffer(stream_id),
-                                    {m_tile_id, n_tile_id},
+			            {m_tile_id, n_tile_id},
                                     result_stream);
                             c_copied_to_host[stream_id] = result_stream.enqueue_event();
                         }
@@ -296,9 +369,13 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
         device_buffer<Scalar>& a_device,
         device_buffer<Scalar>& b_device,
         tiled_matrix<Scalar>& tiled_c_device,
+	char trans_a, char trans_b,
         int m, int n, int k, Scalar alpha, Scalar beta, mm_handle<Scalar>& handle) {
+
     int n_tiles_m, n_tiles_n, n_tiles_k;
-    std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host);
+    std::tie(n_tiles_m, n_tiles_n, n_tiles_k) = get_num_tiles(a_host, b_host, c_host, 
+		                                              m, n, k, 
+							      trans_a, trans_b);
 
     int n_streams = std::min(handle.get_num_streams(), n_tiles_m * n_tiles_n);
     auto& gpu_ctx = handle.get_gpu_context();
@@ -319,7 +396,8 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
                     int actual_size_m, actual_size_n, actual_size_k;
                     std::tie(actual_size_m, actual_size_n, actual_size_k) =
                         get_tile_sizes(a_host, b_host, c_host,
-                                m_tile_id, n_tile_id, k_tile_id);
+                                m_tile_id, n_tile_id, k_tile_id,
+				trans_a, trans_b);
 
                     Scalar new_beta = k_tile_id == 0 ? beta : Scalar{1};
 
@@ -333,12 +411,12 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
 
                         // copy A tile
                         copy_tile_to_device_async(a_host, a_device,
-                                {m_tile_id, k_tile_id},
+			        swap_if_transposed(trans_a, m_tile_id, k_tile_id),
                                 gpu_ctx, stream_id);
 
                         // copy B tile
                         copy_tile_to_device_async(b_host, b_device,
-                                {k_tile_id, n_tile_id},
+			        swap_if_transposed(trans_b, k_tile_id, n_tile_id),
                                 gpu_ctx, stream_id);
 
                         // copy C tile if this is the first partial result and beta > 0
@@ -359,6 +437,7 @@ void round_robin_without_copy_c(tiled_matrix<Scalar>& a_host, tiled_matrix<Scala
                         // perform dgemm
                         auto status = cublas_gemm_wrapper(
                                 gpu_ctx.get_blas_handle(stream_id),
+				trans_a, trans_b,
                                 actual_size_m, actual_size_n, actual_size_k,
                                 &alpha,
                                 a_device.stream_buffer(stream_id),
@@ -411,28 +490,61 @@ void gpu_dgemm_(mm_handle& m_handle, double* a, double* b, double* c,
 }
 */
 template<typename Scalar>
-void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c, 
-        int m, int n, int k,
-        Scalar alpha, Scalar beta, bool pin_host_buffers, bool copy_c_back) {
+void gemm(mm_handle<Scalar>& handle, 
+	  char transa, char transb,
+          int m, int n, int k,
+	  Scalar alpha,
+	  Scalar* a, int ld_a,
+	  Scalar* b, int ld_b, 
+	  Scalar beta,
+	  Scalar* c, int ld_c,
+          bool pin_host_buffers, bool copy_c_back) {
+
+    char trans_a = std::toupper(transa);
+    char trans_b = std::toupper(transb);
+
+    // sumatrix size to multiply
+    int a_subm = trans_a == 'N' ? m : k;
+    int a_subn = trans_a == 'N' ? k : m;
+
+    int b_subm = trans_b == 'N' ? k : n;
+    int b_subn = trans_b == 'N' ? n : k;
+
+    int c_subm = m;
+    int c_subn = n;
+
+    // check the leading dimensions
+    if (ld_a < a_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix A must be >= the number of rows.");
+    }
+    // check the leading dimensions
+    if (ld_b < b_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix B must be >= the number of rows.");
+    }
+    // check the leading dimensions
+    if (ld_c < c_subm) {
+        std::runtime_error("[ERROR] Leading dimensions for matrix C must be >= the number of rows.");
+    }
+
     if (pin_host_buffers) {
         // pin matrix A
         // auto start = std::chrono::steady_clock::now();
         auto status = gpu::runtime_api::host_register(
                 a,
-                m * k * sizeof(Scalar),
+                ld_a * a_subn * sizeof(Scalar),
                 gpu::runtime_api::flag::HostRegisterDefault);
         gpu::check_runtime_status(status);
         // pin matrix B
         status = gpu::runtime_api::host_register(
                 b,
-                k * n * sizeof(Scalar),
+                ld_b * b_subn * sizeof(Scalar),
                 gpu::runtime_api::flag::HostRegisterDefault);
         gpu::check_runtime_status(status);
         // pin matrix C
         if (copy_c_back == true || std::abs(beta) >0) {
             status = gpu::runtime_api::host_register(
                     c,
-                    m * n * sizeof(Scalar),
+                    ld_c * c_subn * sizeof(Scalar),
                     gpu::runtime_api::flag::HostRegisterDefault);
             gpu::check_runtime_status(status);
         }
@@ -450,10 +562,20 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
         handle.set_full_sizes(m, n, k);
     }
 
+    // tile sizes
+    int a_tile_subm = trans_a == 'N' ? tile_size_m : tile_size_k;
+    int a_tile_subn = trans_a == 'N' ? tile_size_k : tile_size_m;
+
+    int b_tile_subm = trans_b == 'N' ? tile_size_k : tile_size_n;
+    int b_tile_subn = trans_b == 'N' ? tile_size_n : tile_size_k;
+
+    int c_tile_subm = tile_size_m;
+    int c_tile_subn = tile_size_n;
+
     // set these tile sizes to CPU matrices
-    tiled_matrix<Scalar> a_host(a, m, k, {tile_size_m, tile_size_k});
-    tiled_matrix<Scalar> b_host(b, k, n, {tile_size_k, tile_size_n});
-    tiled_matrix<Scalar> c_host(c, m, n, {tile_size_m, tile_size_n});
+    tiled_matrix<Scalar> a_host(a, a_subm, a_subn, ld_a, {a_tile_subm, a_tile_subn});
+    tiled_matrix<Scalar> b_host(b, b_subm, b_subn, ld_b, {b_tile_subm, b_tile_subn});
+    tiled_matrix<Scalar> c_host(c, c_subm, c_subn, ld_c, {c_tile_subm, c_tile_subn});
 
     // get GPU matrices
     device_buffer<Scalar>& a_device = handle.get_device_buffer_a();
@@ -462,16 +584,18 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
 
     // used only when copy_c_back == false
     device_vector<Scalar>& full_c_device = handle.get_full_device_buffer_c();
-    tiled_matrix<Scalar> tiled_c_device(full_c_device.data(), m, n, {tile_size_m, tile_size_n});
+    tiled_matrix<Scalar> tiled_c_device(full_c_device.data(), c_subm, c_subn, ld_c, {c_tile_subm, c_tile_subn});
 
     if (copy_c_back) {
         round_robin(a_host, b_host, c_host,
                     a_device, b_device, c_device,
+		    trans_a, trans_b,
                     m, n, k, alpha, beta, handle);
     } else {
         round_robin_without_copy_c(
                     a_host, b_host, c_host,
                     a_device, b_device, tiled_c_device,
+		    trans_a, trans_b,
                     m, n, k, alpha, beta, handle);
     }
 
@@ -499,22 +623,48 @@ void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
     }
 }
 
+template void gemm<float>(
+	mm_handle<float>& handle,
+	char transa, char transb,
+	int m, int n, int k,
+	float alpha,
+	float* a, int ld_a,
+	float* b, int ld_b, 
+	float beta,
+	float* c, int ld_c,
+	bool pin_host_buffers, bool copy_c_back);
 
-
-template void gemm<float>(mm_handle<float>& handle, float* a, float* b, float* c,
+template void gemm<double>(
+	mm_handle<double>& handle,
+	char transa, char transb,
         int m, int n, int k,
-        float alpha, float beta, bool pin_host_buffers, bool copy_c_back);
+	double alpha,
+	double* a, int ld_a,
+	double* b, int ld_b, 
+	double beta,
+	double* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
-template void gemm<double>(mm_handle<double>& handle, double* a, double* b, double* c,
+template void gemm<zfloat>(
+	mm_handle<zfloat>& handle,
+	char transa, char transb,
         int m, int n, int k,
-        double alpha, double beta, bool pin_host_buffers, bool copy_c_back);
+	zfloat alpha,
+	zfloat* a, int ld_a,
+	zfloat* b, int ld_b, 
+	zfloat beta,
+	zfloat* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
-template void gemm<zfloat>(mm_handle<zfloat>& handle, zfloat* a, zfloat* b, zfloat* c,
+template void gemm<zdouble>(
+	mm_handle<zdouble>& handle,
+	char transa, char transb,
         int m, int n, int k,
-        zfloat alpha, zfloat beta, bool pin_host_buffers, bool copy_c_back);
-
-template void gemm<zdouble>(mm_handle<zdouble>& handle, zdouble* a, zdouble* b, zdouble* c,
-        int m, int n, int k,
-        zdouble alpha, zdouble beta, bool pin_host_buffers, bool copy_c_back);
+	zdouble alpha,
+	zdouble* a, int ld_a,
+	zdouble* b, int ld_b, 
+	zdouble beta,
+	zdouble* c, int ld_c,
+        bool pin_host_buffers, bool copy_c_back);
 
 }

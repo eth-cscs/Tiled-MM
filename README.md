@@ -1,6 +1,24 @@
-# Tiled-MM
 
-This is a library for multiplying matrices on GPU. As opposed to NVIDIA's `cublas`, this library takes pointer from the host side (CPU), performs tiling and then copies and multiplies tile by tile on a GPU.
+
+
+## Table of Contents
+- [Overview](#overview)
+- [Performance](#performance)
+- [Features](#features)
+- [Building and Installing](#building-and-installing)
+- [Minimal Working Example](#minimal-working-example)
+- [Running the Benchmarks](#running-the-benchmarks)
+- [Testing](#testing)
+- [Author](#author)
+
+
+## Overview
+
+Tiled-MM is a very fast and easy-to-use library for multiplying matrices on GPU. As opposed to NVIDIA's `cublas`, this library takes pointer from the host side (CPU), splits the matrices into tiles, pipelines them efficiently to the GPU and copies the result back to the CPU. It can serve as almost a drop-in replacement for `cublasXt`, and is ported to both NVIDIA and AMD gpus.
+
+It offers more features than the standard cublas API. For example, the user can specify the number of gpu streams to be used, as well as the tile size for each dimension separately, which is not possible with the standard cublas API.
+
+Tiled-MM is used in production as a backend of the [COSMA](https://github.com/eth-cscs/COSMA) algorithm and is thus well-tested.
 
 ## Performance
 
@@ -16,11 +34,6 @@ In the benchmark, we used `double precision`, `square matrices` given in `column
 - The user can reuse the same context (and thus the same device memory) for many multiplications which can lead to significant performance improvements.
 - Fully templatized, supporting arbitrary data types.
 - Ported to both `NVIDIA` and `AMD` GPUs.
-
-## Limitations
-
-These are just current limitations which are planned to be handled in some future release.
-- At the moment supports only the column-major ordering of `A, B` and `C`, but this can be easily improved.
 
 ## Building and Installing
 
@@ -43,7 +56,7 @@ The option `-DTILEDMM_GPU_BACKEND` can have the following values:
 - `CUDA`: for NVIDIA GPUs
 - `ROCM`: for AMD GPUs
 
-## Example
+## Minimal Working Example
 
 Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
@@ -99,7 +112,7 @@ int n_streams = 2;
 
 auto ctx = gpu::make_context(n_streams, tile_size_m, tile_size_n, tile_size_k);
 ```
-## Running the Benchmark
+## Running the Benchmarks
 
 For detailed benchmarking, there is a miniapp that takes the host pointers for A, B and C and computes `C = beta * C + alpha * A * B` outputing the time-to-solution, as well as the throughput.
 
@@ -229,6 +242,7 @@ Time [ms] with copying C back: 11
 Time [ms] without copying C back: 10
 The result is CORRECT
 ```
+Running `make test` will few default tests.
 
 ## Author
 Marko Kabic (marko.kabic@inf.ethz.ch)

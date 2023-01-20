@@ -101,7 +101,7 @@ auto ctx = gpu::make_context(n_streams, tile_size_m, tile_size_n, tile_size_k);
 ```
 ## Running the Benchmark
 
-For detailed benchmarking, there is a miniapp that performs takes the host pointers for A, B and C and computes `C = beta * C + alpha * A * B` outputing the time-to-solution, as well as the throughput.
+For detailed benchmarking, there is a miniapp that takes the host pointers for A, B and C and computes `C = beta * C + alpha * A * B` outputing the time-to-solution, as well as the throughput.
 
 The miniapp consists of the executable `./build/examples/multiply` which can be run with the following command line (assuming we are in the root folder of the project):
 ```bash
@@ -181,11 +181,54 @@ should produce the following output:
 
 ## Testing
 
-The result is compared against `cublasXt`. 
-The tests can be run inside the build folder with:
+For testing purposes, there is a testing miniapp that generates random matrices A, B and C, computes `C = beta * C + alpha * A * B` with Tiled-MM as well as with blas and outputs whether the results are correct.
+
+The miniapp consists of the executable `./build/tests/test-multiply` **supports the same parameters** as the benchmarking miniapp (see above). It can be run e.g. with the following command line (assuming we are in the root folder of the project):
 ```bash
-make test
+./build/tests/test-multiply -m 1000 -n 1000 -k 1000 --transpose=TN
+```
+which should produce the following output:
+```bash 
+==================================================
+                Benchmarking Tiled-MM
+==================================================
+         MATRIX SIZES
+=============================
+ A = (1000, 1000)
+ B = (1000, 1000)
+ C = (1000, 1000)
+=============================
+         LEADING DIMS
+=============================
+ LD_A = 1000
+ LD_B = 1000
+ LD_C = 1000
+=============================
+      SCALING CONSTANTS
+=============================
+ alpha = 1
+ beta  = 1
+=============================
+      TRANSPOSE FLAGS
+=============================
+ trans_a = T
+ trans_b = N
+=============================
+         TILE SIZES
+=============================
+ tile_m = 5000
+ tile_n = 5000
+ tile_k = 5000
+=============================
+      ADDITIONAL OPTIONS
+=============================
+ num. of gpu streams = 2
+ num. of repetitions = 1
+=============================
+Time [ms] with copying C back: 11
+Time [ms] without copying C back: 10
+The result is CORRECT
 ```
 
 ## Author
-Marko Kabic (marko.kabic@cscs.ch)
+Marko Kabic (marko.kabic@inf.ethz.ch)

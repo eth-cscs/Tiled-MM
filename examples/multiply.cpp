@@ -7,21 +7,18 @@
 #include <cstdio>
 #include <chrono>
 
-using value_type = double;
-using size_type  = size_t;
-
 int main(int argc, char** argv){
     cxxopts::Options options("Benchmarking Tiled-MM", "Measures the runtime of the Tiled-MM algorithm.");
 
     options.add_options()
 	    ("m,m_dim", 
-	        "The number of rows of the resulting matrix C.", 
+	        "the number of rows of the resulting matrix c.", 
 		cxxopts::value<int>()->default_value("1000"))
 	    ("n,n_dim", 
-	        "The number of columns of the resulting matrix C.", 
+	        "the number of columns of the resulting matrix c.", 
 		cxxopts::value<int>()->default_value("1000"))
 	    ("k,k_dim", 
-	        "The size of the shared dimension between matrices A and B.", 
+	        "the size of the shared dimension between matrices a and b.", 
 		cxxopts::value<int>()->default_value("1000"))
 	    ("tile_m", 
 	        "The tile size for dimension m.", 
@@ -154,11 +151,11 @@ int main(int argc, char** argv){
     size_t flops_per_mul = 2 * m * n * k;
 
     // A dimensions: MxK
-    auto a_host = gpu::malloc_pinned<value_type>(a_m * a_n, 1);
+    auto a_host = gpu::malloc_pinned<double>(a_m * a_n, 1);
     // B dimensions: KxN
-    auto b_host = gpu::malloc_pinned<value_type>(b_m * b_n, 1);
+    auto b_host = gpu::malloc_pinned<double>(b_m * b_n, 1);
     // C dimensions: MxN
-    auto c_host = gpu::malloc_pinned<value_type>(c_m * c_n, 0);
+    auto c_host = gpu::malloc_pinned<double>(c_m * c_n, 0);
 
     auto ctx = gpu::make_context<double>(n_streams, tile_m, tile_n, tile_k);
 

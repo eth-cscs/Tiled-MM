@@ -47,15 +47,15 @@ The option `-DTILEDMM_GPU_BACKEND` can have the following values:
 
 Using the library is very simple, just include `#include <tiled_mm.hpp>` and use it as follows:
 ```cpp
-// A dimensions: MxK
-auto a_host = gpu::malloc_pinned<double>(M*K, 1);
-// B dimensions: KxN
-auto b_host = gpu::malloc_pinned<double>(K*N, 1);
-// C dimensions: MxN
-auto c_host = gpu::malloc_pinned<double>(M*N, 0);
+// A dimensions: m x k
+auto a_host = gpu::malloc_pinned<double>(m * k, 1);
+// B dimensions: k x n
+auto b_host = gpu::malloc_pinned<double>(k * n, 1);
+// C dimensions: m x n
+auto c_host = gpu::malloc_pinned<double>(m * n, 0);
 
 double alpha = 1.0;
-double beta = 1.0;
+double beta = 0.0;
 
 // preallocates device buffers and other CUDA stuff
 // the context does not have to be created explicitly
@@ -65,35 +65,119 @@ auto ctx = gpu::make_context();
 // compute c = alpha * a * b + beta * c
 // There is also a version without ctx, in case the user
 // does not want to create the context explicitly
-gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta);
+gpu::gemm(*ctx,
+          trans_a, trans_b,
+          m, n, k,
+          alpha,
+          a_host, ld_a,
+          b_host, ld_b,
+          beta,
+          c_host, ld_c);
 
 // optionally, we can set the following two boolean flags
 bool pin_buffers = false; // since a_host, b_host and c_host are already pinned, gpu::dgemm should not pin them
 bool copy_c_back = true;  // if we want to copy the result back to the host or leave it on the gpu
-gpu::dgemm(ctx, a_host, b_host, c_host, M, N, K, alpha, beta, pin_buffers, copy_c_back);
+gpu::gemm(*ctx,
+          trans_a, trans_b,
+          m, n, k,
+          alpha,
+          a_host, ld_a,
+          b_host, ld_b,
+          beta,
+          c_host, ld_c,
+          pin_buffers, copy_c_back);
 
 // if copy_c_back == false, the result is stored on the device with the following pointer:
 double* c_device = ctx->get_full_device_buffer_c().data()
 ```
 When creating the context, the user can specify tile dimensions and the number of streams to be used as:
 ```cpp
-int tile_size_m = 4000;
-int tile_size_n = 4000;
-int tile_size_k = 4000;
-int n_streams = 4;
+int tile_size_m = 5000;
+int tile_size_n = 5000;
+int tile_size_k = 5000;
+int n_streams = 2;
 
 auto ctx = gpu::make_context(n_streams, tile_size_m, tile_size_n, tile_size_k);
 ```
+## Running the Benchmark
 
-After compilation, there is a small example application that can be run from the build folder as follows:
+For detailed benchmarking, there is a miniapp that performs takes the host pointers for A, B and C and computes `C = beta * C + alpha * A * B` outputing the time-to-solution, as well as the throughput.
+
+The miniapp consists of the executable `./build/examples/multiply` which can be run with the following command line (assuming we are in the root folder of the project):
 ```bash
-./examples/multiply -m 10000 -n 10000 -k 10000 -r 1
+./build/examples/multiply -m 10000 -n 10000 -k 10000 -r 1
 ```
-Where flags have the following meaning:
-- `m`: Number of rows of `A` and `C`.
-- `n`: Number of columns of `A` and `C`.
-- `k`: Number of columns of `A` and rows of `B`.
-- `r`: Number of repetitions.
+The overview of all supported options is given below:
+Option Flags | POSSIBLE VALUES | DESCRIPTION
+| :------------------- | :------------------- |:------------------- |
+`m (--m_dim)` | positive integer | Number of rows of `C`
+`n (--n_dim)` | positive integer | Number of columns of `C`
+`k (--k_dim)` | positive integer | size of the shared dimension between matrices `A` and `B`
+`--tile_m` | positive integer | tile size for dimension `m`
+`--tile_n` | positive integer | tile size for dimension `n`
+`--tile_k` | positive integer | tile size for dimension `k`
+`--ld_a` | positive integer | leading dimension of matrix `A`
+`--ld_b` | positive integer | leading dimension of matrix `B`
+`--ld_c` | positive integer | leading dimension of matrix `C`
+`-t (--transpose)` | a string XY, where X, Y can be one of {N, T, C} | transpose flags for matrices A and B
+`--alpha` | real value (double) | the `alpha` in `C = beta * C + alpha * A * B`
+`--beta` | real value (double) | the `beta` in `C = beta * C + alpha * A * B`
+
+For example, running with the following flags:
+```bash
+./build/examples/multiply -m 1000 -n 1000 -k 1000 --transpose=TN -r 1
+```
+should produce the following output:
+```bash
+==================================================
+                Benchmarking Tiled-MM
+==================================================
+         MATRIX SIZES
+=============================
+ A = (1000, 1000)
+ B = (1000, 1000)
+ C = (1000, 1000)
+=============================
+         LEADING DIMS
+=============================
+ LD_A = 1000
+ LD_B = 1000
+ LD_C = 1000
+=============================
+      SCALING CONSTANTS
+=============================
+ alpha = 1
+ beta  = 1
+=============================
+      TRANSPOSE FLAGS
+=============================
+ trans_a = T
+ trans_b = N
+=============================
+         TILE SIZES
+=============================
+ tile_m = 5000
+ tile_n = 5000
+ tile_k = 5000
+=============================
+      ADDITIONAL OPTIONS
+=============================
+ num. of gpu streams = 2
+ num. of repetitions = 1
+=============================
+
+==================================================
+         Results of benchmarking Tiled-MM
+==================================================
+ 1) The version with copying C to back to host:
+    -> Avg Time [ms] = 11
+    -> Throughput [Gflops] = 181.818
+==================================================
+ 2) The version without copying C to back to host:
+    -> Avg Time [ms] = 10
+    -> Throughput [Gflops] = 200
+==================================================
+```
 
 ## Testing
 

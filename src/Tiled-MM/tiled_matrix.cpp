@@ -5,8 +5,10 @@
 using namespace gpu;
 
 template<typename Scalar>
-tiled_matrix<Scalar>::tiled_matrix(Scalar* host_ptr, int rows, int cols, tile_dim d):
-        ptr(host_ptr), n_rows(rows), n_cols(cols), tile(d) {
+tiled_matrix<Scalar>::tiled_matrix(Scalar* host_ptr, 
+		                   int rows, int cols, int ld, 
+				   tile_dim d):
+        ptr(host_ptr), n_rows(rows), n_cols(cols), ld(ld), tile(d) {
 
     tile.set_rows(std::min(tile.rows(), rows));
     tile.set_cols(std::min(tile.cols(), cols));
@@ -16,6 +18,7 @@ tiled_matrix<Scalar>::tiled_matrix(Scalar* host_ptr, int rows, int cols, tile_di
 
     int short_tile_size_row = rows % tile.rows();
     int short_tile_size_col = cols % tile.cols();
+
     short_tile = tile_dim(short_tile_size_row, short_tile_size_col);
 }
 
@@ -46,13 +49,18 @@ int tiled_matrix<Scalar>::cols() {
 }
 
 template<typename Scalar>
+int tiled_matrix<Scalar>::leading_dim() {
+    return ld;
+}
+
+template<typename Scalar>
 Scalar* tiled_matrix<Scalar>::data() {
     return ptr;
 }
 
 template<typename Scalar>
 int tiled_matrix<Scalar>::tile_offset(tile_coord t_coord) {
-    int tile_offset_global = (t_coord.col_index()*tile.cols()) * n_rows;
+    int tile_offset_global = (t_coord.col_index() * tile.cols()) * ld;
     int el_offset_global = t_coord.row_index() * tile.rows();
     int offset = tile_offset_global + el_offset_global;
     return offset;

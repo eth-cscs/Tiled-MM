@@ -61,6 +61,8 @@
 */
 namespace gpu {
 
+blas_api::OperationType get_blas_operation(char trans);
+
 // **************************************
 //        TILED-GEMM ON GPU
 // **************************************
@@ -68,6 +70,6 @@ template<typename Scalar>
 void gemm(mm_handle<Scalar>& handle, Scalar* a, Scalar* b, Scalar* c,
 	  char trans_a, char trans_b, 
           int m, int n, int k,
+	  int ld_a, int ld_b, int ld_c,
           Scalar alpha, Scalar beta, bool pin_host_buffers = true, bool copy_c_back=true);
-
 }

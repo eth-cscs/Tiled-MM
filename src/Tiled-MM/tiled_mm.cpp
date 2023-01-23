@@ -191,7 +191,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
     blas_api::OperationType op_b = get_blas_operation(trans_b);
 
     int ld_a = get_first(trans_a, m , k);
-    int ld_b = get_first(trans_a, k , n);
+    int ld_b = get_first(trans_b, k , n);
 
     return blas_api::sgemm(handle, op_a, op_b, m, n, k,
                          alpha, a, ld_a, b, ld_b, beta, c, lld_c);
@@ -234,7 +234,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
     blas_api::OperationType op_b = get_blas_operation(trans_b);
 
     int ld_a = get_first(trans_a, m , k);
-    int ld_b = get_first(trans_a, k , n);
+    int ld_b = get_first(trans_b, k , n);
 
     return blas_api::cgemm(handle, op_a, op_b, m, n, k,
                          reinterpret_cast<const blas_api::ComplexFloatType*>(alpha),
@@ -257,7 +257,7 @@ blas_api::StatusType cublas_gemm_wrapper(blas_api::HandleType handle,
     blas_api::OperationType op_b = get_blas_operation(trans_b);
 
     int ld_a = get_first(trans_a, m , k);
-    int ld_b = get_first(trans_a, k , n);
+    int ld_b = get_first(trans_b, k , n);
 
     return blas_api::zgemm(handle, op_a, op_b, m, n, k,
                          reinterpret_cast<const blas_api::ComplexDoubleType*>(alpha),

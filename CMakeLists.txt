@@ -86,15 +86,7 @@ install(FILES "${Tiled-MM_BINARY_DIR}/Tiled-MMConfig.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tiled-MM")
 
 if(TILEDMM_WITH_TESTS OR TILEDMM_WITH_EXAMPLES)
-  include(GitSubmodule)
-  check_git_submodule(cxxopts "libs/cxxopts")
-  if(NOT cxxopts_avail)
-    # attempt to find system installation of pybind11
-    find_package(cxxopts REQUIRED)
-  else()
-    message(VERBOSE "Using cxxopts as git submodule from libs/cxxopts")
-    add_subdirectory(libs/cxxopts)
-  endif()
+  find_package(cxxopts REQUIRED)
 endif()
 
 if(TILEDMM_WITH_TESTS)

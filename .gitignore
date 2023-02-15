@@ -6,3 +6,5 @@ exports
 doc
 .idea*
 CMakeLists.txt.user
+/spack-build-*
+/.cache/

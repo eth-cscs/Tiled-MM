@@ -51,7 +51,7 @@ test1:
 test2:
   extends: .run_tests
   stage: test
-  script: /src/spack-build/tests/-m 5 -n 2 -k 2 --tile_m 4 --tile_n 4 --tile_k 4 --beta 0 --n_streams 2
+  script: /src/spack-build/tests/test-multiply -m 5 -n 2 -k 2 --tile_m 4 --tile_n 4 --tile_k 4 --beta 0 --n_streams 2
   variables:
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 1

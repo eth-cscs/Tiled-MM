@@ -59,5 +59,5 @@ RUN ldconfig
 # create environments for several configurations and install dependencies
 RUN spack env create -d /tiledmm-env-cuda && \
     spack -e /tiledmm-env-cuda add "tiled-mm@master %gcc +cuda +tests +shared  " && \
-    spack -e /tiledmm-env-cuda develop -p /src cosma@master && \
+    spack -e /tiledmm-env-cuda develop -p /src tiled-mm@master && \
     spack -e /tiledmm-env-cuda install --only=dependencies --fail-fast

@@ -332,7 +332,7 @@ void round_robin(tiled_matrix<Scalar>& a_host, tiled_matrix<Scalar>& b_host, til
                         // perform dgemm
                         // cublasSetStream(get_blas_handle(stream_id), streams[stream_id].stream());
                         // std::cout << "performing dgemm" << std::endl;
-                        if (k_tile_id == 0 && std::abs(beta) > 0) {
+                        if (k_tile_id == 0) {
                             current_stream.wait_on_event(c_copied_to_host[stream_id]);
                         }
 

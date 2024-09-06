@@ -7,7 +7,7 @@ stages:
   - test
 
 build base image:
-  extends: .container-builder-dynamic-name
+  extends: [.dynamic-image-name, .container-builder-cscs-gh200]
   stage: baseimage
   timeout: 2h
   variables:
@@ -16,7 +16,7 @@ build base image:
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/base/tiledmm-ci
 
 build tiled-mm:
-  extends: .container-builder
+  extends: .container-builder-cscs-gh200
   needs: ["build base image"]
   stage: build
   variables:
@@ -26,11 +26,14 @@ build tiled-mm:
     DOCKER_BUILD_ARGS: '["BASE_IMAGE=${BASE_IMAGE}", "ENVPATH=$ENVPATH"]'
 
 .run_tests:
-  extends: .container-runner-daint-gpu
+  extends: [.f7t-container-runner]
   needs: ["build tiled-mm"]
   stage: test
   image: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA
   variables:
+    F7T_URL: 'https://firecrest-todi.v1.tds.cscs.ch'
+    FIRECREST_SYSTEM: 'todi'
+    ARCH: 'aarch64'
     GIT_STRATEGY: none
     MPICH_MAX_THREAD_SAFETY: multiple
     CSCS_REGISTRY_LOGIN: 'YES'

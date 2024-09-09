@@ -10,7 +10,7 @@ ENV PATH="/spack/bin:${PATH}"
 
 ENV MPICH_VERSION=3.4.3
 
-ENV CMAKE_VERSION=3.27.9
+ENV CMAKE_VERSION=3.30.3
 
 RUN apt-get -y update
 
@@ -23,7 +23,7 @@ RUN apt-get install -y --no-install-recommends gcc g++ gfortran clang libomp-14-
   liblzma-dev libbz2-dev
 
 # install CMake
-RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz -O cmake.tar.gz && \
+RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz -O cmake.tar.gz && \
     tar zxvf cmake.tar.gz --strip-components=1 -C /usr
 
 # get latest version of spack

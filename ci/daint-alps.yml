@@ -40,7 +40,7 @@ build tiled-mm:
     PULL_IMAGE: 'YES'
     SLURM_HINT: nomultithread
     SLURM_UNBUFFEREDIO: ''
-    SLURM_WAIT: 0
+    # SLURM_WAIT: 0
 
 test1:
   extends: .run_tests

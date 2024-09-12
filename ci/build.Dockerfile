@@ -14,4 +14,4 @@ RUN spack -e $ENVPATH find -lcdv
 
 # we need a fixed name for the build directory
 # here is a hacky workaround to link ./spack-build-{hash} to ./spack-build
-RUN cd /src && ln -s $(spack -e $ENVPATH location -b tiled-mm) spack-build
+RUN cd /src && cp -r $(spack -e $ENVPATH location -b tiled-mm) spack-build

@@ -28,7 +28,7 @@ build tiled-mm:
     DOCKER_BUILD_ARGS: '["BASE_IMAGE=${BASE_IMAGE}", "ENVPATH=$ENVPATH"]'
 
 .run_tests:
-  extends: [.f7t-container-runner]
+  extends: [.container-runner-todi-gh200]
   needs: ["build tiled-mm"]
   stage: test
   image: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA

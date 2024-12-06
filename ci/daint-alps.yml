@@ -33,9 +33,6 @@ build tiled-mm:
   stage: test
   image: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA
   variables:
-    F7T_URL: 'https://firecrest-todi.v1.tds.cscs.ch'
-    FIRECREST_SYSTEM: 'todi'
-    ARCH: 'aarch64'
     GIT_STRATEGY: none
     MPICH_MAX_THREAD_SAFETY: multiple
     CSCS_REGISTRY_LOGIN: 'YES'
@@ -43,7 +40,6 @@ build tiled-mm:
     SLURM_HINT: nomultithread
     SLURM_UNBUFFEREDIO: ''
     SLURM_RESERVATION: 'NCCL'
-    USE_CE: 'YES'
     SLURM_MPI: "pmi2"
     # Workaround after update until hooks are fixed
     ENROOT_LIBRARY_PATH: /capstor/scratch/cscs/fmohamed/enrootlibn

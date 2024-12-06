@@ -63,6 +63,7 @@ install(FILES "${Tiled-MM_BINARY_DIR}/Tiled-MMConfig.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/Tiled-MM")
 
 if(TILEDMM_WITH_TESTS OR TILEDMM_WITH_EXAMPLES)
+  include(FetchContent)
   FetchContent_Declare(cxxopts
                        GIT_REPOSITORY https://github.com/jarro2783/cxxopts.git
                        GIT_TAG        4bf61f08697b110d9e3991864650a405b3dd515d # v3.2.1

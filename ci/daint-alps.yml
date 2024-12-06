@@ -7,26 +7,28 @@ stages:
   - test
 
 build base image:
-  extends: .container-builder-dynamic-name
+  extends: [.dynamic-image-name, .container-builder-cscs-gh200]
   stage: baseimage
   timeout: 2h
   variables:
+    SLURM_RESERVATION: 'NCCL'
     DOCKERFILE: ci/baseimage.cuda.Dockerfile
     WATCH_FILECHANGES: ci/baseimage.cuda.Dockerfile
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/base/tiledmm-ci
 
 build tiled-mm:
-  extends: .container-builder
+  extends: .container-builder-cscs-gh200
   needs: ["build base image"]
   stage: build
   variables:
+    SLURM_RESERVATION: 'NCCL'
     DOCKERFILE: ci/build.Dockerfile
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA
     ENVPATH: "/tiledmm-env-cuda"
     DOCKER_BUILD_ARGS: '["BASE_IMAGE=${BASE_IMAGE}", "ENVPATH=$ENVPATH"]'
 
 .run_tests:
-  extends: .container-runner-daint-gpu
+  extends: [.container-runner-todi-gh200]
   needs: ["build tiled-mm"]
   stage: test
   image: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA
@@ -37,7 +39,11 @@ build tiled-mm:
     PULL_IMAGE: 'YES'
     SLURM_HINT: nomultithread
     SLURM_UNBUFFEREDIO: ''
-    SLURM_WAIT: 0
+    SLURM_RESERVATION: 'NCCL'
+    SLURM_MPI: "pmi2"
+    # Workaround after update until hooks are fixed
+    ENROOT_LIBRARY_PATH: /capstor/scratch/cscs/fmohamed/enrootlibn
+    # SLURM_WAIT: 0
 
 test1:
   extends: .run_tests

@@ -11,6 +11,7 @@ build base image:
   stage: baseimage
   timeout: 2h
   variables:
+    SLURM_RESERVATION: 'NCCL'
     DOCKERFILE: ci/baseimage.cuda.Dockerfile
     WATCH_FILECHANGES: ci/baseimage.cuda.Dockerfile
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/base/tiledmm-ci
@@ -20,6 +21,7 @@ build tiled-mm:
   needs: ["build base image"]
   stage: build
   variables:
+    SLURM_RESERVATION: 'NCCL'
     DOCKERFILE: ci/build.Dockerfile
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/tiledmm/tiledmm-ci:$CI_COMMIT_SHA
     ENVPATH: "/tiledmm-env-cuda"
@@ -42,6 +44,9 @@ build tiled-mm:
     SLURM_UNBUFFEREDIO: ''
     SLURM_RESERVATION: 'NCCL'
     USE_CE: 'YES'
+    SLURM_MPI: "pmi2"
+    # Workaround after update until hooks are fixed
+    ENROOT_LIBRARY_PATH: /capstor/scratch/cscs/fmohamed/enrootlibn
     # SLURM_WAIT: 0
 
 test1:

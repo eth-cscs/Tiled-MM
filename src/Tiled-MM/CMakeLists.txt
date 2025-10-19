@@ -5,6 +5,18 @@ add_library(Tiled-MM gpu_context.cpp
                      tiled_mm.cpp
                      tile_coord.cpp)
 
+# Add BF16 conversion kernels if support is enabled
+if(TILED_MM_HAS_BF16_SUPPORT)
+  message(STATUS "Adding BF16 conversion kernels to Tiled-MM")
+  if(${TILED_MM_CUDA})
+    message(STATUS "  - Using CUDA backend: bf16_convert.cu")
+    target_sources(Tiled-MM PRIVATE bf16_convert.cu)
+  elseif(${TILED_MM_ROCM})
+    message(STATUS "  - Using ROCm backend: bf16_convert.hip")
+    target_sources(Tiled-MM PRIVATE bf16_convert.hip)
+  endif()
+endif()
+
 target_link_libraries(Tiled-MM PUBLIC
   $<$<BOOL:${TILED_MM_ROCM}>:roc::rocblas>
   $<$<BOOL:${TILED_MM_CUDA}>:CUDA::cublas CUDA::cudart>

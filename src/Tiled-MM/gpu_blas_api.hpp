@@ -32,9 +32,11 @@
 
 #if defined(TILED_MM_CUDA)
 #include <cublas_v2.h>
+#include <cuda_bf16.h>  // For __nv_bfloat16 type
 
 #elif defined(TILED_MM_ROCM)
 #include <rocblas/rocblas.h>
+#include <hip/hip_bfloat16.h>  // For hip_bfloat16 type
 
 #else
 #error Either TILED_MM_CUDA or TILED_MM_ROCM must be defined!
@@ -249,6 +251,58 @@ inline auto zgemm(ARGS... args) -> StatusType {
 #endif // TILED_MM_ROCBLAS_HAS_ZGEMM
 
 #endif // TILED_MM_CUDA
+}
+
+// BFloat16 GEMM (mixed precision: BF16 × BF16 → FP32)
+// Requires CUDA 11.0+ with Ampere (SM 80+) or ROCm 4.5+ with CDNA2 (gfx90a)
+inline auto gemm_bf16(
+    HandleType handle,
+    OperationType trans_a,
+    OperationType trans_b,
+    int m, int n, int k,
+    const float* alpha,          // FP32 scalar
+    const void* A,               // BF16 matrix (device pointer)
+    int lda,
+    const void* B,               // BF16 matrix (device pointer)
+    int ldb,
+    const float* beta,           // FP32 scalar
+    float* C,                    // FP32 matrix (device pointer)
+    int ldc
+) -> StatusType {
+#if defined(TILED_MM_CUDA)
+    // Use cublasGemmEx for mixed-precision BF16 × BF16 → FP32
+    // Requires CUDA 11.0+ and Ampere GPU (SM 80+)
+    return cublasGemmEx(
+        handle,
+        trans_a, trans_b,
+        m, n, k,
+        alpha,
+        A, CUDA_R_16BF, lda,     // BF16 input A
+        B, CUDA_R_16BF, ldb,     // BF16 input B
+        beta,
+        C, CUDA_R_32F, ldc,      // FP32 output C
+        CUBLAS_COMPUTE_32F,      // FP32 accumulation
+        CUBLAS_GEMM_DEFAULT_TENSOR_OP  // Use Tensor Cores if available
+    );
+#elif defined(TILED_MM_ROCM)
+    // Use rocblas_gemm_ex for mixed-precision BF16 × BF16 → FP32
+    // Requires ROCm 4.5+ and CDNA2 GPU (gfx90a)
+    return rocblas_gemm_ex(
+        handle,
+        trans_a, trans_b,
+        m, n, k,
+        alpha,
+        A, rocblas_datatype_bf16_r, lda,   // BF16 input A
+        B, rocblas_datatype_bf16_r, ldb,   // BF16 input B
+        beta,
+        C, rocblas_datatype_f32_r, ldc,    // FP32 output C (in)
+        C, rocblas_datatype_f32_r, ldc,    // FP32 output C (out)
+        rocblas_datatype_f32_r,            // FP32 compute type
+        rocblas_gemm_algo_standard,
+        0,      // solution_index
+        0       // flags
+    );
+#endif
 }
 
 }  // namespace blas_api
